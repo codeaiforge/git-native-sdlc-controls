@@ -1,0 +1,6 @@
+T0: { min_approvers: 1, checks: [lint], deploy_approval: standard }
+T1: { min_approvers: 1, checks: [lint, sast], deploy_approval: standard }
+T2: { min_approvers: 1, checks: [lint, sast, secrets, deps], deploy_approval: owner,
+      require_owning_team_reviewer: true }
+T3: { min_approvers: 2, checks: [lint, sast, secrets, deps], deploy_approval: change_advisory,
+      require_owning_team_reviewer: true, independent_approver_required: true }

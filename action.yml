@@ -1,0 +1,86 @@
+name: 'SDLC controls'
+description: 'Tier a change from its git diff and a declared component map, and gate on the tier''s controls.'
+author: 'codeaiforge'
+
+# This file sits at the repository root, not in action/, on purpose. A local
+# Docker action is built with the action metadata's own directory as the build
+# context, so metadata in action/ could only ever see action/ — and the image
+# would have to fetch the CLI from a published module rather than build the
+# source next to it. At the root, `action/Dockerfile` builds this working tree.
+
+inputs:
+  config:
+    description: 'Path to the component map YAML.'
+    required: true
+    default: 'config/components.yaml'
+  policy:
+    description: 'Path to the tier policy YAML. Empty uses the built-in baseline policy.'
+    required: false
+    default: ''
+  base:
+    description: 'Base ref of the change.'
+    required: true
+  head:
+    description: 'Head ref of the change.'
+    required: false
+    default: 'HEAD'
+  change-id:
+    description: 'Identifier recorded in the evidence record (e.g. PR-123).'
+    required: false
+    default: ''
+  author:
+    description: 'Change author, for the independent-approver control.'
+    required: false
+    default: ''
+  approvers:
+    description: >-
+      Comma-separated approvers. Leave empty when the approver set is not available to the run;
+      approver controls are then recorded as unverified rather than passed.
+    required: false
+    default: ''
+  approvers-known:
+    description: >-
+      Set true when `approvers` came from an actual query of the forge, so an empty list means
+      "nobody approved this" and fails the tier's min_approvers. Left false, an empty list means
+      "nobody was asked" and the approver controls are recorded as unverified.
+    required: false
+    default: 'false'
+  evidence-out:
+    description: 'Path to write the evidence record to, for upload as an artifact.'
+    required: false
+    default: 'evidence.json'
+  format:
+    description: 'Output format written to the job log: text or json.'
+    required: false
+    default: 'text'
+
+# The step fails (non-zero exit) when the change does not meet its tier's controls.
+# The evidence record is left at `evidence-out` for the workflow to upload.
+runs:
+  using: 'docker'
+  image: 'action/Dockerfile'
+  args:
+    - 'tier'
+    - '--base'
+    - ${{ inputs.base }}
+    - '--head'
+    - ${{ inputs.head }}
+    - '--config'
+    - ${{ inputs.config }}
+    - '--policy'
+    - ${{ inputs.policy }}
+    - '--change-id'
+    - ${{ inputs.change-id }}
+    - '--author'
+    - ${{ inputs.author }}
+    - '--approvers'
+    - ${{ inputs.approvers }}
+    - --approvers-known=${{ inputs.approvers-known }}
+    - '--evidence-out'
+    - ${{ inputs.evidence-out }}
+    - '--format'
+    - ${{ inputs.format }}
+
+branding:
+  icon: 'git-branch'
+  color: 'gray-dark'

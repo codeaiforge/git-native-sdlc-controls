@@ -1,0 +1,23 @@
+version: 1
+defaults: { unmatched_path_tier: high, breadth_threshold: 4 }
+components:
+  - id: trade-processor
+    match: ["trade-processor/**"]
+    criticality: critical
+    shared: false
+  - id: accounts-service
+    match: ["account-service/**", "accounts/**"]
+    criticality: critical
+    shared: false
+  - id: reference-data
+    match: ["reference-data/**"]
+    criticality: high
+    shared: true          # depended on by other services (high fan-in)
+  - id: position-service
+    match: ["position-service/**"]
+    criticality: high
+    shared: false
+  - id: web-client
+    match: ["web-client/**", "web-gui/**"]
+    criticality: low
+    shared: false

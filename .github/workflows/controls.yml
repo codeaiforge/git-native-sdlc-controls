@@ -1,0 +1,122 @@
+# The dogfood gate: this repository enforces its own controls on its own pull
+# requests, using the binary it ships.
+name: controls
+
+on:
+  pull_request:
+  # Approvals land after a pull request is opened, so the gate re-runs when a
+  # review is submitted or dismissed. Without this trigger the approver controls
+  # could only ever be evaluated against an empty set, which is precisely the
+  # failure mode CAF-SDLC-011 exists to prevent.
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read # to read the pull request's reviews
+
+jobs:
+  controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Pin both triggers to the pull request head: on pull_request_review the
+          # default checkout would be the base branch. refs/pull/N/head rather than
+          # the head sha, because it exists in this repository even when the pull
+          # request comes from a fork. Full history, because the tier is computed
+          # against the merge base.
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: make build
+
+      - name: Collect the approver set
+        id: approvers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # GitHub counts the latest non-comment review per reviewer: a comment
+          # left after an approval does not revoke it, but a dismissal or a
+          # change request does. Count them the same way, or this gate would
+          # credit approvals the forge itself no longer honours.
+          approvers=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" \
+            --jq 'map(select(.state != "COMMENTED"))
+                  | group_by(.user.login) | map(last)
+                  | map(select(.state == "APPROVED") | .user.login)
+                  | unique | join(",")')
+          echo "list=${approvers}" >> "$GITHUB_OUTPUT"
+          echo "approvers: ${approvers:-(none)}"
+
+      - name: Tier this change
+        id: tier
+        # Event data reaches the shell through the environment, never through
+        # ${{ }} interpolation into the script body.
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          APPROVERS: ${{ steps.approvers.outputs.list }}
+        run: |
+          set -o pipefail
+          # --approvers-known: the set above came from an actual query, so an
+          # empty result means nobody approved, not that nobody looked.
+          ./bin/sdlc-controls tier \
+            --base "origin/${BASE}" \
+            --head "${HEAD}" \
+            --config config/components.yaml \
+            --policy config/tier-policy.example.yaml \
+            --change-id "PR-${PR}" \
+            --author "${AUTHOR}" \
+            --approvers "${APPROVERS}" \
+            --approvers-known \
+            --evidence-out evidence.json \
+          | tee tier.txt
+
+      - name: Post tier and reasons
+        if: always()
+        run: |
+          # The job summary, not a pull request comment: a pull_request run from
+          # a fork gets a read-only token, and a gate that cannot report on fork
+          # contributions is not a gate.
+          {
+            echo '## SDLC controls'
+            echo
+            echo '```'
+            cat tier.txt 2>/dev/null || echo 'the controls run did not produce a decision'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdlc-controls-evidence
+          path: evidence.json
+          if-no-files-found: warn
+
+  action:
+    # The action carries no logic, but it has to build: a wrapper nobody can
+    # build is a wrapper nobody can use.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the action image
+        run: docker build -f action/Dockerfile -t sdlc-controls-action .
+      - name: Smoke-test the entrypoint
+        run: docker run --rm sdlc-controls-action --help

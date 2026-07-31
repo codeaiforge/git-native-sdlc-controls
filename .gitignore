@@ -1,0 +1,8 @@
+/dist/
+/bin/
+/tmp/
+/.memsearch/
+*.out
+coverage.txt
+.env
+.DS_Store

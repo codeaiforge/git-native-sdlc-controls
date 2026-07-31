@@ -1,0 +1,20 @@
+version: 1
+defaults:
+  unmatched_path_tier: high
+  breadth_threshold: 4
+components:
+  - id: payment-authorization
+    match: ["services/payment-auth/**", "libs/payment-core/**"]
+    criticality: critical
+    shared: false
+    owners: ["@org/payments-core"]
+  - id: shared-contracts
+    match: ["contracts/**", "libs/api-schemas/**"]
+    criticality: high
+    shared: true
+    owners: ["@org/platform"]
+  - id: marketing-site
+    match: ["apps/www/**"]
+    criticality: low
+    shared: false
+    owners: ["@org/web"]

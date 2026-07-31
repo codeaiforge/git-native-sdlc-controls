@@ -1,0 +1,58 @@
+# This repository's own component map — the one the dogfood gate in
+# .github/workflows/controls.yml runs against. config/components.example.yaml is
+# the annotated template for other repositories; this is the live map for this one.
+version: 1
+defaults:
+  unmatched_path_tier: high
+  breadth_threshold: 4
+components:
+  - id: engine-core
+    match: ["internal/core/**"]
+    criticality: high
+    shared: true          # every CI adapter depends on it; changes reach all of them
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: cli
+    match: ["cmd/**"]
+    criticality: high
+    shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: control-definitions
+    match: ["docs/controls/**", "docs/evidence-schema.md"]
+    criticality: high
+    shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: control-config
+    match: ["config/**"]
+    criticality: high
+    shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: ci
+    match: [".github/**"]
+    criticality: high
+    shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: action
+    match: ["action/**"]
+    criticality: medium
+    shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  - id: docs
+    match: ["docs/**"]
+    criticality: low
+    shared: false
+
+  - id: examples
+    match: ["examples/**"]
+    criticality: low
+    shared: false
+
+  - id: project-meta
+    match: ["*.md", "LICENSE", "Makefile", "go.mod", "go.sum", ".gitignore"]
+    criticality: low
+    shared: false
