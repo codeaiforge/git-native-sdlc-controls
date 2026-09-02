@@ -1,0 +1,25 @@
+{
+  "change_id": "DEMO-t0-web-client",
+  "binding_used": "git-native-baseline@1",
+  "tier": "T0",
+  "affected_set": [
+    "web-client"
+  ],
+  "unmatched_set": [],
+  "reasons": [
+    "web-client criticality=low -> base T0"
+  ],
+  "controls_enforced": {
+    "min_approvers": 1,
+    "checks": [
+      "lint"
+    ],
+    "deploy_approval": "standard"
+  },
+  "ai_assisted": false,
+  "accountable_approver": "bob",
+  "approver_ne_author": true,
+  "approver_count": 1,
+  "map_version": 1,
+  "computed_at": "2026-09-02T06:06:44.543520082Z"
+}

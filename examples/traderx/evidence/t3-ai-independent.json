@@ -1,0 +1,37 @@
+{
+  "change_id": "DEMO-t3-ai-independent",
+  "binding_used": "git-native-baseline@1",
+  "tier": "T3",
+  "affected_set": [
+    "reference-data"
+  ],
+  "unmatched_set": [],
+  "reasons": [
+    "reference-data criticality=high -> base T2",
+    "reference-data shared=true -> +1"
+  ],
+  "controls_enforced": {
+    "min_approvers": 2,
+    "checks": [
+      "lint",
+      "sast",
+      "secrets",
+      "deps"
+    ],
+    "deploy_approval": "change_advisory",
+    "require_owning_team_reviewer": true,
+    "independent_approver_required": true
+  },
+  "ai_assisted": true,
+  "ai_tool": "claude-code",
+  "ai_session": "demo-4f21",
+  "prompt_ref": "TRADERX-412",
+  "accountable_approver": "carol",
+  "approver_ne_author": true,
+  "approver_count": 2,
+  "warnings": [
+    "tier requires an owning-team reviewer (no owners declared in the component map): enforced by CODEOWNERS and branch protection, not verified by this run"
+  ],
+  "map_version": 1,
+  "computed_at": "2026-09-02T06:06:44.557856798Z"
+}

@@ -48,7 +48,7 @@ components:
     shared: false
 
   - id: examples
-    match: ["examples/**"]
+    match: ["examples/**", "scripts/**"]   # the demo, its map and its evidence
     criticality: low
     shared: false
 
