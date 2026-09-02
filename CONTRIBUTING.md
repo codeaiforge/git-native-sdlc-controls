@@ -6,6 +6,7 @@
 $ make build   # CGO_ENABLED=0 go build -o bin/sdlc-controls ./cmd/sdlc-controls
 $ make test    # go test ./...
 $ make lint    # go vet ./...
+$ make demo    # ./scripts/demo.sh — tiers four changes in a throwaway TraderX-shaped repo
 ```
 
 Go 1.22 or later. The only dependency is `gopkg.in/yaml.v3`, and it is used above `internal/core`

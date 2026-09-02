@@ -50,6 +50,41 @@ it, and a portable evidence record. See [docs/architecture.md](docs/architecture
 
 ## Quickstart
 
+Run the demo. Go and git are the only prerequisites, and it needs no network:
+
+```console
+$ make demo
+```
+
+It builds a throwaway repository shaped like [FINOS TraderX](https://github.com/finos/traderX),
+commits four changes to it, and tiers each one against
+[examples/traderx/components.yaml](examples/traderx/components.yaml). Two of the four are blocked —
+this is the one-line change to a shared service:
+
+```console
+$ sdlc-controls tier --base main --head refdata-fix --config components.yaml --change-id DEMO-t3-reference-data --evidence-out evidence/t3-reference-data.json --author alice --approvers bob
+change:  DEMO-t3-reference-data
+tier:    T3
+binding: git-native-baseline@1
+affected: reference-data
+unmatched: (none)
+reasons:
+  - reference-data criticality=high -> base T2
+  - reference-data shared=true -> +1
+required: min_approvers=2 checks=lint, sast, secrets, deps independent_approver=true
+ai_assisted: false
+warning: tier requires an owning-team reviewer (no owners declared in the component map): enforced by CODEOWNERS and branch protection, not verified by this run
+FAIL: T3 requires 2 approver(s), found 1
+exit: 1 — controls not met, the gate blocks the merge
+```
+
+Every run writes an evidence record. The demo's four are committed in
+[examples/traderx/evidence/](examples/traderx/evidence/), so the output is readable before you run
+anything; the full walkthrough — including an AI-assisted change its own author cannot approve — is in
+[examples/traderx/](examples/traderx/).
+
+## Use it on your own repository
+
 Build the binary from a clone — one static binary, no runtime to install:
 
 ```console
@@ -87,8 +122,7 @@ evidence can settle; approver rules and the named checks are enforced by branch 
 CI jobs the policy names. Anything it did not verify itself says so, in the record, rather than
 appearing to have passed. Pass `--approvers` and it verifies those too.
 
-A worked example on a real polyglot codebase is in [examples/traderx/](examples/traderx/), and this
-repository runs the gate on its own pull requests in
+This repository runs the same gate on its own pull requests, in
 [.github/workflows/controls.yml](.github/workflows/controls.yml).
 
 ## The honest ceiling
