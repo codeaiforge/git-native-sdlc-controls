@@ -145,6 +145,11 @@ Aligned to the emerging FINOS SDLC controls framework. Not endorsed by, or part 
 The approach supports DORA change-management outcomes — proportionate control over changes to critical
 systems, with evidence — as *a* compliant means, not the only one.
 
+## Maintainer
+
+Built and maintained by [CodeAIForge](https://codeaiforge.com) — open an issue, or get in touch if
+you want help running this on real repositories.
+
 ## License
 
 Apache-2.0.
