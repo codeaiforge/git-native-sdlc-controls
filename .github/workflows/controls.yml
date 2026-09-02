@@ -43,6 +43,24 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Demo
+        # The first command anyone reading the README runs. If it breaks, it
+        # breaks here rather than in front of them.
+        run: make demo
+
+      - name: The committed evidence records are the ones the demo just produced
+        # `make demo` overwrote examples/traderx/evidence/ above. Committed
+        # evidence that no longer matches a real run is worse than none: it
+        # reads as a record and is a fossil. computed_at is the wall clock of
+        # the run and is expected to differ; nothing else may.
+        run: |
+          set -euo pipefail
+          for f in examples/traderx/evidence/*.json; do
+            diff -u <(git show "HEAD:$f" | jq 'del(.computed_at)') \
+                    <(jq 'del(.computed_at)' "$f") \
+              || { echo "::error file=$f::stale — re-run 'make demo' and commit the result"; exit 1; }
+          done
+
       - name: Collect the approver set
         id: approvers
         env:
