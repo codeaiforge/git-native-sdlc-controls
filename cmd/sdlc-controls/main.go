@@ -47,19 +47,25 @@ Exit codes: 0 controls met, 1 controls not met, 2 usage or runtime error.
 `
 
 func main() {
-	if len(os.Args) < 2 {
+	os.Exit(run(os.Args[1:]))
+}
+
+// run is main's dispatch, taking args without the program name so it is
+// callable from tests without spawning a subprocess to observe os.Exit.
+func run(args []string) int {
+	if len(args) < 1 {
 		fmt.Fprint(os.Stderr, usage)
-		os.Exit(2)
+		return 2
 	}
-	switch os.Args[1] {
+	switch args[0] {
 	case "tier":
-		os.Exit(runTier(os.Args[2:]))
+		return runTier(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
-		os.Exit(0)
+		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n%s", os.Args[1], usage)
-		os.Exit(2)
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n%s", args[0], usage)
+		return 2
 	}
 }
 
