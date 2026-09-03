@@ -38,7 +38,7 @@ someone who has neither the repository nor the CI system in front of them.
 | `prompt_ref` | string | CAF-SDLC-010; optional pointer to the issue or task |
 | `accountable_approver` | string | CAF-SDLC-011; omitted when no approver set was available |
 | `approver_ne_author` | bool | CAF-SDLC-011; **absent means not verified**, not "false" |
-| `approver_count` | int | approvers seen, checked against `min_approvers`; **absent means not verified**, and `0` means verified nobody |
+| `approver_count` | int | **distinct** approvers seen (folded case-insensitively), checked against `min_approvers`; **absent means not verified**, and `0` means verified nobody |
 | `warnings` | string[] | cross-repo consumers, stale-map hints, unverified controls |
 | `map_version` | int | `version` of the component map used |
 | `computed_at` | RFC 3339 (UTC) | when the decision was made |

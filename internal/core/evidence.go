@@ -95,8 +95,9 @@ func BuildEvidence(in EvaluateInput, tier Tier, affected []Component, unmatched 
 	}
 
 	if in.ApproversKnown {
-		approver, independent := accountableApprover(in.Author, in.Approvers)
-		count := len(in.Approvers)
+		approvers := distinctApprovers(in.Approvers)
+		approver, independent := accountableApprover(in.Author, approvers)
+		count := len(approvers)
 		rec.AccountableApprover = approver
 		rec.ApproverNeAuthor = &independent
 		rec.ApproverCount = &count
@@ -124,6 +125,37 @@ func (r EvidenceRecord) Violations() []string {
 		v = append(v, fmt.Sprintf("%s requires an approver distinct from the author (CAF-SDLC-011)", r.Tier))
 	}
 	return v
+}
+
+// distinctApprovers folds an approver list to one entry per identity: trimmed,
+// compared case-insensitively, first spelling kept.
+//
+// min_approvers is a count of approvers, not of list entries, and the engine
+// cannot assume its caller already deduplicated. The two workflows shipped here
+// do (`jq unique`), but the documented way to reach a new CI system is a job
+// definition rather than a second implementation, and such a job passes on
+// whatever the forge API returned. Counting entries would let one reviewer
+// listed twice satisfy a two-approver tier, and would put "approver_count": 2
+// in the evidence when one human approved — the record asserting something that
+// did not happen, which is the failure this tool exists to prevent.
+//
+// Identity is still a handle: this collapses "alice" and "Alice", not one human
+// with two accounts. See docs/controls/CAF-SDLC-011-independent-approver.md.
+func distinctApprovers(approvers []string) []string {
+	seen := make(map[string]struct{}, len(approvers))
+	out := make([]string, 0, len(approvers))
+	for _, a := range approvers {
+		if a = strings.TrimSpace(a); a == "" {
+			continue
+		}
+		key := strings.ToLower(a)
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, a)
+	}
+	return out
 }
 
 // accountableApprover picks the approver that satisfies segregation of duties:

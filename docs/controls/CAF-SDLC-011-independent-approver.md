@@ -51,9 +51,10 @@ Four limits, none of them incidental:
 - **"Author" is a handle the caller supplies, not the person who prompted.** The engine compares
   approvers against whatever `--author` was passed — in practice the forge account that raised the
   change. Whoever ran the model is not an input, is not knowable from a diff, and is not checked.
-- **Identity is string comparison.** Handles are matched case-insensitively after trimming. One human
-  with two accounts satisfies the check; so does a service account approving on someone's behalf.
-  Tying accounts to people is the forge's job.
+- **Identity is string comparison.** Handles are matched case-insensitively after trimming, and the
+  same handle appearing twice counts once — so a reviewer listed twice cannot buy a two-approver
+  tier. One human with *two accounts* still satisfies the check, though, as does a service account
+  approving on someone's behalf. Tying accounts to people is the forge's job.
 - **The committer is not checked at all.** There is no committer input to the engine. A rule about
   author *and* committer would need one.
 
@@ -68,7 +69,7 @@ segregation of duties between two forge accounts, at a tier the policy chooses.
 |---|---|
 | `accountable_approver` | the approver who satisfies segregation of duties |
 | `approver_ne_author` | whether that approver is distinct from the author; absent when unverified |
-| `approver_count` | number of approvers seen, checked against the tier's `min_approvers` |
+| `approver_count` | number of **distinct** approvers seen, checked against the tier's `min_approvers` |
 
 ## Basis
 

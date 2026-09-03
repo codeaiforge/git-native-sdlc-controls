@@ -119,6 +119,7 @@ func TestIndependentApproverControl(t *testing.T) {
 		name            string
 		author          string
 		approvers       []string
+		wantCount       int
 		wantIndependent bool
 		wantViolation   string
 	}{
@@ -126,6 +127,7 @@ func TestIndependentApproverControl(t *testing.T) {
 			name:            "self-approval fails the T3 independent-approver control",
 			author:          "dev-a",
 			approvers:       []string{"dev-a", "dev-a"},
+			wantCount:       1,
 			wantIndependent: false,
 			wantViolation:   "distinct from the author",
 		},
@@ -133,12 +135,14 @@ func TestIndependentApproverControl(t *testing.T) {
 			name:            "a second, independent approver satisfies it",
 			author:          "dev-a",
 			approvers:       []string{"dev-a", "dev-b"},
+			wantCount:       2,
 			wantIndependent: true,
 		},
 		{
 			name:            "one independent approver still misses the T3 count",
 			author:          "dev-a",
 			approvers:       []string{"dev-b"},
+			wantCount:       1,
 			wantIndependent: true,
 			wantViolation:   "requires 2 approver(s), found 1",
 		},
@@ -146,8 +150,44 @@ func TestIndependentApproverControl(t *testing.T) {
 			name:            "a verified empty approver set fails, it does not pass unverified",
 			author:          "dev-a",
 			approvers:       nil,
+			wantCount:       0,
 			wantIndependent: false,
 			wantViolation:   "requires 2 approver(s), found 0",
+		},
+		{
+			// The gap that matters: one reviewer listed twice must not satisfy a
+			// two-approver tier, and must not be recorded as two approvers. A
+			// forge that returns a reviewer twice, or a CI adapter that does not
+			// deduplicate, would otherwise buy an approval that never happened.
+			name:            "one approver listed twice is one approver",
+			author:          "dev-a",
+			approvers:       []string{"dev-b", "dev-b"},
+			wantCount:       1,
+			wantIndependent: true,
+			wantViolation:   "requires 2 approver(s), found 1",
+		},
+		{
+			name:            "the same handle in two spellings is one approver",
+			author:          "dev-a",
+			approvers:       []string{"dev-b", "DEV-B", " dev-b "},
+			wantCount:       1,
+			wantIndependent: true,
+			wantViolation:   "requires 2 approver(s), found 1",
+		},
+		{
+			name:            "deduplication does not swallow a genuine second approver",
+			author:          "dev-a",
+			approvers:       []string{"dev-b", "DEV-B", "dev-c"},
+			wantCount:       2,
+			wantIndependent: true,
+		},
+		{
+			name:            "the author padding the set out cannot buy the count",
+			author:          "dev-a",
+			approvers:       []string{"dev-a", "DEV-A", " dev-a "},
+			wantCount:       1,
+			wantIndependent: false,
+			wantViolation:   "requires 2 approver(s), found 1",
 		},
 	}
 
@@ -169,8 +209,10 @@ func TestIndependentApproverControl(t *testing.T) {
 			if rec.ApproverNeAuthor == nil || *rec.ApproverNeAuthor != tc.wantIndependent {
 				t.Errorf("approver_ne_author = %v, want %v", rec.ApproverNeAuthor, tc.wantIndependent)
 			}
-			if rec.ApproverCount == nil || *rec.ApproverCount != len(tc.approvers) {
-				t.Errorf("approver_count = %v, want %d", rec.ApproverCount, len(tc.approvers))
+			if rec.ApproverCount == nil {
+				t.Errorf("approver_count is nil, want %d", tc.wantCount)
+			} else if *rec.ApproverCount != tc.wantCount {
+				t.Errorf("approver_count = %d, want %d", *rec.ApproverCount, tc.wantCount)
 			}
 			violations := rec.Violations()
 			if tc.wantViolation == "" {
