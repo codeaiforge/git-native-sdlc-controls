@@ -40,7 +40,11 @@ changes).
 - **Single static binary** is the primary release artifact (`CGO_ENABLED=0`).
 - **License:** Apache-2.0.
 - **Determinism:** every tier decision emits an ordered reason list.
-- **Dogfood:** the repo enforces its own controls in `.github/workflows/controls.yml`.
+- **Dogfood:** the repo enforces its own controls in `.gitea/workflows/controls.yml` (where its
+  pull requests are actually reviewed) and `.github/workflows/controls.yml` (the mirror). Same
+  gate, same binary, same flags; they differ only in how the approver set is read out of the
+  forge API. Change one, change the other. Both fire on pushes to `main` as well as pull requests:
+  a push run tiers and records but cannot verify approvals, and must not pass `--approvers-known`.
 - **Provenance (soft):** on **AI-assisted** commits, use trailers `AI-Assisted:`, `AI-Tool:`,
   `AI-Session:`. Not required on every commit — but do not claim provenance-tracking while leaving
   AI-authored commits unlabelled. Commits are authored manually; Claude Code should add these trailers
@@ -116,8 +120,9 @@ that component is declared `shared`.
 - Table-driven tests cover: T0 leaf change, `shared` escalation, the T3 cap, breadth escalation, the
   unmatched-path fail-safe, trailer parsing, and the independent-approver control.
 - The CLI exits 0 / 1 / 2 (controls met / not met / error) and can write the evidence record to a file.
-- `.github/workflows/controls.yml` tiers this repository's own pull requests against
-  `config/components.yaml`, posts the tier and reasons, and uploads the evidence artifact.
+- `.gitea/workflows/controls.yml` and `.github/workflows/controls.yml` tier this repository's own
+  pull requests against `config/components.yaml`, post the tier and reasons, and upload the evidence
+  artifact.
 - No file from the §0 private list exists anywhere in the repo.
 
 ## 8. Do not

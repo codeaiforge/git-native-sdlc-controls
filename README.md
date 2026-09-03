@@ -1,5 +1,7 @@
 # git-native-sdlc-controls
 
+[![controls](https://github.com/codeaiforge/git-native-sdlc-controls/actions/workflows/controls.yml/badge.svg)](https://github.com/codeaiforge/git-native-sdlc-controls/actions/workflows/controls.yml)
+
 A git-native, tooling-agnostic reference implementation of SDLC controls-as-code: it assigns a risk
 tier to every change and enforces proportionate controls in CI, using only git primitives.
 
@@ -122,8 +124,17 @@ evidence can settle; approver rules and the named checks are enforced by branch 
 CI jobs the policy names. Anything it did not verify itself says so, in the record, rather than
 appearing to have passed. Pass `--approvers` and it verifies those too.
 
-This repository runs the same gate on its own pull requests, in
-[.github/workflows/controls.yml](.github/workflows/controls.yml).
+This repository runs the gate on itself, on two forges: in
+[.gitea/workflows/controls.yml](.gitea/workflows/controls.yml) where its changes are actually
+reviewed, and in [.github/workflows/controls.yml](.github/workflows/controls.yml) on the mirror. The
+two differ in one step — reading the approver set out of the forge's API — and call the same binary
+with the same flags.
+
+Both run on pushes to `main` as well as on pull requests, because most changes here land as a direct
+push and a gate that only fires on pull requests would tier none of them. A push run tiers the pushed
+range and writes the evidence record, but it cannot verify approvals — there is no approver set to
+read — so it records those controls as required and unverified. Only a pull request can settle them.
+The badge above is the mirror's history of those runs.
 
 ## The honest ceiling
 

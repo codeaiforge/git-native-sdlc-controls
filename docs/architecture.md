@@ -56,6 +56,12 @@ that platform calls them, and interprets the exit code. Adding a platform means 
 definition — no change to `internal/core`, and no second implementation of the algorithm to keep in
 step with the first.
 
+That is demonstrated rather than asserted: the gate runs on two forges, in
+[.gitea/workflows/controls.yml](../.gitea/workflows/controls.yml) and
+[.github/workflows/controls.yml](../.github/workflows/controls.yml). They differ in one step — reading
+the approver set out of the forge's API, `gh api` on one and `curl` on the other — and the rest is the
+same binary with the same flags.
+
 The GitHub Action is exactly this: a multi-stage Dockerfile that builds the binary and sets it as the
 entrypoint. It has no logic of its own.
 
