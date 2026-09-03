@@ -119,8 +119,12 @@ jobs:
             # so the approver controls are recorded as required and unverified
             # rather than as a verified zero that nobody could ever have met.
             approval=()
-            # The first push of a branch reports an all-zero "before".
+            # The first push of a branch reports an all-zero "before", and after
+            # a force-push the old "before" is no longer reachable. Either way
+            # there is no range to diff, so fall back to the pushed commit alone
+            # rather than failing the gate on a history event.
             case "${base}" in *[!0]*) ;; *) base="${head}~1" ;; esac
+            git cat-file -e "${base}^{commit}" 2>/dev/null || base="${head}~1"
           fi
           ./bin/sdlc-controls tier \
             --base "${base}" \
