@@ -1,10 +1,11 @@
-# The dogfood gate: this repository enforces its own controls on its own pull
-# requests, using the binary it ships.
+# The dogfood gate, on Gitea. This repository's pull requests are reviewed on
+# Gitea; GitHub is a push mirror, so .github/workflows/controls.yml only ever
+# runs if someone opens a pull request there. The two files are the same gate
+# and must be kept in step.
 #
-# This is the GitHub mirror's copy. Changes are reviewed on Gitea, so the gate
-# that actually runs on a pull request is .gitea/workflows/controls.yml. The two
-# are the same gate — same binary, same flags, one forge-specific step for
-# reading the approver set — and must be kept in step.
+# Nothing here is a second implementation: the same binary, the same flags. The
+# only forge-specific step is reading the approver set out of the forge's API,
+# which is exactly the boundary the design puts at the edge of the CLI.
 name: controls
 
 on:
@@ -22,9 +23,8 @@ on:
   pull_request_review:
     types: [submitted, dismissed]
 
-permissions:
-  contents: read
-  pull-requests: read # to read the pull request's reviews
+# No permissions: block — Gitea 1.22 does not implement per-job token scoping,
+# and a block that does nothing here would read as a control that is in force.
 
 jobs:
   controls:
@@ -33,17 +33,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # Pin both triggers to the pull request head: on pull_request_review the
-          # default checkout would be the base branch. refs/pull/N/head rather than
-          # the head sha, because it exists in this repository even when the pull
-          # request comes from a fork. Full history, because the tier is computed
-          # against the merge base.
+          # default checkout would be the base branch. Gitea publishes
+          # refs/pull/<index>/head the same way GitHub does. Full history, because
+          # the tier is computed against the merge base.
           ref: "${{ github.event.pull_request.number && format('refs/pull/{0}/head', github.event.pull_request.number) || github.sha }}"
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache: true
+          # cache: false — the module cache would need Gitea's actions cache
+          # service. A gate that fails when the cache server is unavailable is a
+          # gate that fails for reasons that have nothing to do with the change.
+          cache: false
 
       - name: Vet
         run: go vet ./...
@@ -78,19 +80,29 @@ jobs:
         # approver controls as unverified instead of as met.
         if: github.event.pull_request.number
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gitea injects GITEA_TOKEN into every workflow run; no secret to set up.
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1
+          REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          # GitHub counts the latest non-comment review per reviewer: a comment
-          # left after an approval does not revoke it, but a dismissal or a
-          # change request does. Count them the same way, or this gate would
-          # credit approvals the forge itself no longer honours.
-          approvers=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" \
-            --jq 'map(select(.state != "COMMENTED"))
-                  | group_by(.user.login) | map(last)
-                  | map(select(.state == "APPROVED") | .user.login)
-                  | unique | join(",")')
+          # The same rule GitHub applies, in Gitea's vocabulary: count the latest
+          # non-comment, non-pending review per reviewer, and only if it has not
+          # been dismissed. A comment left after an approval does not revoke it;
+          # a dismissal or a change request does. Count them any other way and
+          # this gate credits approvals the forge itself no longer honours.
+          #
+          # ponytail: one page of 100 reviews, not pagination. A pull request
+          # with more than a hundred reviews has a problem this gate cannot fix.
+          reviews=$(curl -sSf -H "Authorization: token ${TOKEN}" \
+            "${API}/repos/${REPO}/pulls/${PR}/reviews?limit=100")
+          approvers=$(printf '%s' "$reviews" | jq -r '
+            map(select(.state != "COMMENT" and .state != "PENDING"
+                       and ((.dismissed // false) | not)))
+            | group_by(.user.login) | map(last)
+            | map(select(.state == "APPROVED") | .user.login)
+            | unique | join(",")')
           echo "list=${approvers}" >> "$GITHUB_OUTPUT"
           echo "approvers: ${approvers:-(none)}"
 
@@ -136,16 +148,16 @@ jobs:
       - name: Post tier and reasons
         if: always()
         run: |
-          # The job summary, not a pull request comment: a pull_request run from
-          # a fork gets a read-only token, and a gate that cannot report on fork
-          # contributions is not a gate.
+          # Written to the job summary and to the log. Whether this Gitea version
+          # renders a step summary is a property of the instance, and a decision
+          # nobody can read is not a report.
           {
             echo '## SDLC controls'
             echo
             echo '```'
             cat tier.txt 2>/dev/null || echo 'the controls run did not produce a decision'
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload evidence record
         if: always()
@@ -157,7 +169,7 @@ jobs:
 
   action:
     # The action carries no logic, but it has to build: a wrapper nobody can
-    # build is a wrapper nobody can use.
+    # build is a wrapper nobody can use. Needs a runner with a docker socket.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

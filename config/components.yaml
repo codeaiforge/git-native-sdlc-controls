@@ -31,7 +31,7 @@ components:
     owners: ["@codeaiforge/maintainers"]
 
   - id: ci
-    match: [".github/**"]
+    match: [".github/**", ".gitea/**"]
     criticality: high
     shared: false
     owners: ["@codeaiforge/maintainers"]
