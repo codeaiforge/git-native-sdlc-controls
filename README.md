@@ -127,8 +127,8 @@ appearing to have passed. Pass `--approvers` and it verifies those too.
 This repository runs the gate on itself, on two forges: in
 [.gitea/workflows/controls.yml](.gitea/workflows/controls.yml) where its changes are actually
 reviewed, and in [.github/workflows/controls.yml](.github/workflows/controls.yml) on the mirror. The
-two differ in one step — reading the approver set out of the forge's API — and call the same binary
-with the same flags.
+two differ in two places — reading the approver set out of the forge's API, and the version of the
+artifact action each forge can serve — and call the same binary with the same flags.
 
 Both run on pushes to `main` as well as on pull requests, because most changes here land as a direct
 push and a gate that only fires on pull requests would tier none of them. A push run tiers the pushed

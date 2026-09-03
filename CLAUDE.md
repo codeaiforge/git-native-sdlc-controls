@@ -43,7 +43,8 @@ changes).
 - **Dogfood:** the repo enforces its own controls in `.gitea/workflows/controls.yml` (where its
   pull requests are actually reviewed) and `.github/workflows/controls.yml` (the mirror). Same
   gate, same binary, same flags; they differ only in how the approver set is read out of the
-  forge API. Change one, change the other. Both fire on pushes to `main` as well as pull requests:
+  forge API, and in the artifact action version (Gitea 1.22 answers as GHES, so it needs
+  `upload-artifact@v3`). Change one, change the other. Both fire on pushes to `main` as well as pull requests:
   a push run tiers and records but cannot verify approvals, and must not pass `--approvers-known`.
 - **Provenance (soft):** on **AI-assisted** commits, use trailers `AI-Assisted:`, `AI-Tool:`,
   `AI-Session:`. Not required on every commit — but do not claim provenance-tracking while leaving

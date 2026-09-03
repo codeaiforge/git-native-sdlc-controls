@@ -165,7 +165,12 @@ jobs:
 
       - name: Upload evidence record
         if: always()
-        uses: actions/upload-artifact@v4
+        # v3, not v4: Gitea 1.22 answers the artifact API the way GitHub
+        # Enterprise Server does, and @actions/artifact v2 — which v4 of this
+        # action bundles — refuses to talk to GHES at all. The GitHub copy stays
+        # on v4. This and the approver step are the only two places the two
+        # files may differ.
+        uses: actions/upload-artifact@v3
         with:
           name: sdlc-controls-evidence
           path: evidence.json
