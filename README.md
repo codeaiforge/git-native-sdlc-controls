@@ -149,6 +149,23 @@ higher tier rather than passing quietly, and changes to the map itself self-esca
 Neither turns it into a graph. See
 [CAF-SDLC-002](docs/controls/CAF-SDLC-002-change-risk-tiering.md).
 
+## Scope: what is here, and what deliberately is not
+
+Here: the tiering engine, the evidence schema, the tooling-agnostic control definitions, the CLI and
+the demo. Everything needed to put proportionate change control on a repository, Apache-2.0, no
+strings, no account, no hosted service in the path.
+
+Not here: the mapping from these controls to the clauses of any particular regulation. Which article
+a tier satisfies, what an assessor accepts as evidence for it, and how mature a practice has to be to
+survive review are all specific to an entity — its critical functions, its risk appetite, its
+supervisor. Published as if universal, such a mapping is exactly the artefact people cite and then
+find does not hold for them, and the harm lands on the reader rather than the author. The engine is
+general; the interpretation is not, so the interpretation is not in the box.
+
+That boundary is deliberate: the controls are open source because controls nobody can inspect are not
+controls. Making them stand up in front of your own regulator is a different piece of work, one that
+has to know your organisation — a conversation rather than a file. See [Maintainer](#maintainer).
+
 ## Alignment
 
 Aligned to the emerging FINOS SDLC controls framework. Not endorsed by, or part of, FINOS.
