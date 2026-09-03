@@ -15,7 +15,7 @@ Three controls, from a `git diff` and one declared component map:
 |---|---|
 | **CAF-SDLC-002** | Assigns a risk tier (T0–T3) to a change from the declared blast radius of the paths it touches, and escalates the required review, approvers and checks to match. |
 | **CAF-SDLC-010** | Records whether a change was AI-generated or AI-assisted, by which tool, under which session — as git trailers that travel with the commit. |
-| **CAF-SDLC-011** | Requires that an AI-generated change is approved by someone other than the human who prompted it. |
+| **CAF-SDLC-011** | Requires that a change at a tier the policy marks `independent_approver_required` is approved by an account other than its author, and names that approver in the evidence. Segregation of duties between two forge accounts — not proof that the approver did not prompt the model. |
 
 ## Why git-native
 

@@ -87,7 +87,7 @@ Same diff size, different answer: a service other services depend on needs two a
 check set. Nobody filed a change request to make that happen — the tier came from the diff, and the
 gate exits 1.
 
-### An AI-assisted change cannot be approved by its own author
+### An AI-assisted change at T3 cannot be approved by its own author
 
 The same `reference-data` fix, this time with CAF-SDLC-010 trailers on the commit, approved by alice
 who wrote it:

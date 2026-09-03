@@ -28,8 +28,8 @@ field on a component, and enforcement of owner review belongs to the forge. Do n
 claim without the code to back it.
 
 Controls in scope (v0.1): **CAF-SDLC-002** (change risk tiering by blast radius),
-**CAF-SDLC-010** (AI-generated change provenance), **CAF-SDLC-011** (independent approver for AI
-changes).
+**CAF-SDLC-010** (AI-generated change provenance), **CAF-SDLC-011** (independent approver, required by
+the tier policy rather than by AI provenance — see the control for what that does and does not catch).
 
 ## 2. Conventions
 
