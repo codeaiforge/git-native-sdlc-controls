@@ -1,6 +1,7 @@
 # git-native-sdlc-controls
 
 [![controls](https://github.com/codeaiforge/git-native-sdlc-controls/actions/workflows/controls.yml/badge.svg)](https://github.com/codeaiforge/git-native-sdlc-controls/actions/workflows/controls.yml)
+[![coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)](#tests)
 
 A git-native, tooling-agnostic reference implementation of SDLC controls-as-code: it assigns a risk
 tier to every change and enforces proportionate controls in CI, using only git primitives.
@@ -165,6 +166,22 @@ general; the interpretation is not, so the interpretation is not in the box.
 That boundary is deliberate: the controls are open source because controls nobody can inspect are not
 controls. Making them stand up in front of your own regulator is a different piece of work, one that
 has to know your organisation — a conversation rather than a file. See [Maintainer](#maintainer).
+
+## Tests
+
+```bash
+go test ./...           # everything
+go test ./... -cover    # with coverage
+```
+
+`internal/core` is table-driven throughout: the tier algorithm, the T3 cap, the unmatched-path
+fail-safe, trailer parsing and the independent-approver control each have their own cases.
+`cmd/sdlc-controls` covers flag parsing, git invocation, the exit-code contract and
+`--evidence-out` against throwaway repositories built in the test itself.
+
+The badge states a floor, not a snapshot, and CI fails the build if coverage falls below it — a
+number nothing checks is a claim rather than evidence, which is the same standard this tool holds
+its own evidence records to.
 
 ## Alignment
 
