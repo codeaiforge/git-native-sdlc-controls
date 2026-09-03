@@ -16,8 +16,9 @@ is valid and you want credit in the advisory, say so.
 
 ## Supported versions
 
-`main` only. There is no released version and no backport branch; a fix lands on `main` and in the
-next tag.
+`main` and the most recent tag. There is no backport branch and no supported release train: a fix
+lands on `main` and in the next tag, and older tags are not patched. Pin a tag if you run this in a
+pipeline that matters, and watch the repository for releases.
 
 ## What counts as a vulnerability here
 
