@@ -16,7 +16,12 @@ binary; the JSON schemas are versioned independently — see [docs/contract.md](
   projection of the same map and policy the engine tiers against, not a second copy.
 - Published JSON Schemas, Draft 2020-12, committed in-repo and validated in CI against
   the JSON the tool actually emits: [`schemas/evidence/0`](schemas/evidence/0) and
-  [`schemas/policy-binding/0`](schemas/policy-binding/0). Both are experimental at major 0.
+  [`schemas/policy-binding/0`](schemas/policy-binding/0). Both are experimental at major 0
+  and leave `additionalProperties` open at every extension point, so a consumer can pin a
+  schema and keep validating documents from a newer binary. The control identifiers are an
+  open set for the same reason. Only the sets the algorithm fixes — the tier scale and
+  `result.exit_code` — are closed. That the producer emits nothing undocumented is enforced
+  by a test rather than by a closed schema.
 - Evidence records gain four additive fields:
   - `schema_version` — the document shape, versioned independently of the binary;
   - `tool` — the name and version of the binary that produced the record;

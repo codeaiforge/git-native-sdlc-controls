@@ -124,7 +124,7 @@ jobs:
           # a dismissal or a change request does. Count them any other way and
           # this gate credits approvals the forge itself no longer honours.
           #
-          # ponytail: one page of 100 reviews, not pagination. A pull request
+          # One page of 100 reviews, not pagination. A pull request
           # with more than a hundred reviews has a problem this gate cannot fix.
           reviews=$(curl -sSf -H "Authorization: token ${TOKEN}" \
             "${API}/repos/${REPO}/pulls/${PR}/reviews?limit=100")

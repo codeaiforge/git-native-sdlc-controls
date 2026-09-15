@@ -63,7 +63,7 @@ func normalizePath(p string) string {
 	return strings.TrimPrefix(p, "./")
 }
 
-// ponytail: globs are translated to regexps rather than pulling in a glob
+// Globs are translated to regexps rather than pulling in a glob
 // library — `*`, `**` and `?` cover every pattern the component map needs.
 // Swap in a real glob package if brace expansion or character classes ever matter.
 func compileGlobs(m ComponentMap) map[string]*regexp.Regexp {

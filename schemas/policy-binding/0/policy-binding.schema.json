@@ -4,9 +4,9 @@
   "title": "SDLC controls policy binding",
   "description": "The active policy that produced a tier: the tier table and the CAF-SDLC-002 escalation rules, projected from the same map and policy the engine tiers against. Emitted by `sdlc-controls binding --format json`.",
   "x-status": "experimental",
-  "x-stability": "Major version 0 while the binary is 0.x. Fields may be added at any time; a consumer must ignore unknown fields. Removals or renames will bump the schema major to policy-binding/1. See docs/contract.md.",
+  "x-stability": "Major version 0 while the binary is 0.x. Fields may be added in any release, and additionalProperties is left open at every extension point so a pinned copy of this schema keeps validating newer documents; a consumer must ignore fields it does not recognise. Removing a field, renaming one, or narrowing what one means bumps the major to policy-binding/1. Closed sets that the algorithm itself fixes (the tier scale, the exit codes) stay closed. See docs/contract.md.",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": ["schema_version", "tool", "binding", "tiers", "escalation", "map_version"],
   "properties": {
     "schema_version": { "const": "policy-binding/0" },
@@ -19,6 +19,7 @@
       "description": "Required controls per tier. Every tier T0..T3 is present: a missing entry is rejected at load time so it can never read as 'no controls required'.",
       "type": "object",
       "additionalProperties": false,
+      "x-note": "Closed on purpose, unlike the extension points above: the tier scale is fixed at T0..T3 by the algorithm, so an unrecognised key here is a typo rather than a future field.",
       "required": ["T0", "T1", "T2", "T3"],
       "properties": {
         "T0": { "$ref": "#/$defs/controls" },
@@ -35,7 +36,7 @@
     "criticality": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
     "tool": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["name", "version"],
       "properties": {
         "name": { "type": "string" },
@@ -44,7 +45,7 @@
     },
     "controls": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["min_approvers", "checks"],
       "properties": {
         "min_approvers": { "type": "integer", "minimum": 0 },
@@ -57,7 +58,7 @@
     "escalation": {
       "description": "CAF-SDLC-002 rules that move a change off its base tier. A declared-topology approximation of blast radius, not a computed dependency graph.",
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": [
         "unmatched_path_criticality",
         "unmatched_path_tier",

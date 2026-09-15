@@ -333,7 +333,7 @@ func loadComponentMap(path string) (core.ComponentMap, error) {
 // kept outside the repository under test — is reported as ungovernable rather
 // than quietly never matching.
 //
-// ponytail: symlinks are not resolved. A repo reached through a symlinked path
+// Symlinks are not resolved. A repo reached through a symlinked path
 // degrades to "ungovernable" — a warning in the record, never a silent pass.
 func repoRelative(repo, path string) (string, bool) {
 	repoAbs, err := filepath.Abs(repo)

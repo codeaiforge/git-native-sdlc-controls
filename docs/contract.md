@@ -31,14 +31,28 @@ The two schemas version independently of each other too. `evidence/1` alongside
 Both schemas carry `"x-status": "experimental"` and sit at major `0`. While the binary
 is `0.x`:
 
-- **Fields may be added at any time, in a patch release.** A consumer must ignore
-  fields it does not recognise. Every schema sets `additionalProperties: false`, so
-  validating against a *pinned* copy of an older schema will reject a newer document —
-  validate against the schema matching the `schema_version` you received.
+- **Fields may be added at any time, in a patch release.** Every extension point in
+  both schemas leaves `additionalProperties` open, so a **pinned** copy of the schema
+  keeps validating documents from a newer binary. Pin one if you want to; you do not
+  have to re-fetch on every producer upgrade. Your own parser must ignore fields it does
+  not recognise.
 - **Fields will not be removed or renamed without bumping the major**, to `evidence/1`.
-  A document's `schema_version` is the only thing to branch on.
+  Narrowing what an existing field means counts as a removal. A document's
+  `schema_version` is the only thing to branch on.
 - **Optional fields stay optional and keep their meaning.** In particular, an absent
   `approver_ne_author` means *not verified*, and will never come to mean `false`.
+- **The control identifiers are an open set.** New controls add new identifiers within
+  `evidence/0`, so `verification.verified` and `verification.recorded_not_verified` are
+  typed as plain strings rather than an enum. Tolerate one you do not know — do not
+  reject the document, and do not assume an unknown identifier means "passed".
+- **Two sets stay closed**, because the algorithm fixes them rather than the schema: the
+  tier scale (`T0`..`T3`, from `core.MaxTier`) and `result.exit_code` (`0` or `1`; a run
+  that exits `2` emits no document). Changing either is a major bump by definition.
+
+What the open schemas deliberately do **not** do is let the producer emit undocumented
+fields. That is enforced on this side instead: a test asserts every key the tool emits is
+described in the committed schema, so a DTO field added without a schema entry fails the
+build. Openness is for the consumer's validator, not a licence for the producer.
 
 At binary `v1.0` the schemas stabilise to `evidence/1` and `policy-binding/1`, and the
 promise hardens to: additive changes only within a major, and a deprecation period
@@ -62,7 +76,8 @@ The three are derived from the same engine state and cannot disagree.
 
 ### Control identifiers
 
-These strings are part of the contract. The enum is in the schema.
+These strings are part of the contract. The schema lists them as `examples` rather than
+an enum, because the set grows as controls are added — see the stability rules above.
 
 | Identifier | Verified when | Otherwise |
 |---|---|---|

@@ -23,7 +23,7 @@ const (
 	// ToolName and ToolVersion identify the binary that produced a document, so a
 	// record stays attributable to a specific implementation years later.
 	//
-	// ponytail: a plain const, not an ldflags-injected var — the release is cut
+	// A plain const, not an ldflags-injected var — the release is cut
 	// from a tag that matches it. Wire it to -X if builds ever diverge from tags.
 	ToolName    = "sdlc-controls"
 	ToolVersion = "0.2.0"

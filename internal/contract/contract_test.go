@@ -416,3 +416,76 @@ func TestCommittedExampleRecordsValidate(t *testing.T) {
 		})
 	}
 }
+
+// schemaKeys returns the property names a schema documents at its top level.
+func schemaKeys(t *testing.T, path string) map[string]bool {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	var doc struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.NewDecoder(f).Decode(&doc); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	keys := make(map[string]bool, len(doc.Properties))
+	for k := range doc.Properties {
+		keys[k] = true
+	}
+	return keys
+}
+
+// Both schemas leave additionalProperties open so a consumer can pin one and keep
+// validating documents from a newer binary. That openness is for the consumer's
+// validator, not a licence for this side to emit undocumented fields — so the
+// producer half of the bargain is checked here instead: every key the tool emits
+// must be described in the committed schema. Add a DTO field without a schema
+// entry and this fails, which is exactly what additionalProperties:false used to
+// catch, minus the breakage it caused downstream.
+func TestEmittedKeysAreAllDocumented(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema string
+		doc    any
+	}{
+		{
+			name:   "evidence",
+			schema: evidenceSchemaPath,
+			doc: contract.EvidenceFromCore(evaluate(t, core.EvaluateInput{
+				ChangeID: "PR-1", ChangedPaths: []string{"payments/auth.go"},
+				CommitMessages: []string{"feat: x\n\nAI-Assisted: true\nAI-Tool: claude-code\nAI-Session: s1\nPrompt-Ref: #1\n"},
+				Author:         "alice", Approvers: []string{"bob"}, ApproversKnown: true,
+			})),
+		},
+		{
+			name:   "policy binding",
+			schema: bindingSchemaPath,
+			doc:    contract.PolicyBindingFromCore(testMap(), testPolicy()),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			documented := schemaKeys(t, tc.schema)
+			b, err := json.Marshal(tc.doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var emitted map[string]json.RawMessage
+			if err := json.Unmarshal(b, &emitted); err != nil {
+				t.Fatal(err)
+			}
+			if len(emitted) == 0 {
+				t.Fatal("the fixture emitted nothing to check")
+			}
+			for k := range emitted {
+				if !documented[k] {
+					t.Errorf("%q is emitted but not described in %s — document it or drop it", k, tc.schema)
+				}
+			}
+		})
+	}
+}

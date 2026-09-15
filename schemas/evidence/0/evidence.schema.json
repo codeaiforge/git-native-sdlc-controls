@@ -4,9 +4,9 @@
   "title": "SDLC controls evidence record",
   "description": "One record per change: the tier, why that tier, what the tier required, and what this run actually verified. Emitted by `sdlc-controls tier --format json` and by `--evidence-out`.",
   "x-status": "experimental",
-  "x-stability": "Major version 0 while the binary is 0.x. Fields may be added at any time; a consumer must ignore unknown fields. Removals or renames will bump the schema major to evidence/1. See docs/contract.md.",
+  "x-stability": "Major version 0 while the binary is 0.x. Fields may be added in any release, and additionalProperties is left open at every extension point so a pinned copy of this schema keeps validating newer documents; a consumer must ignore fields it does not recognise. Removing a field, renaming one, or narrowing what one means bumps the major to evidence/1. Closed sets that the algorithm itself fixes (the tier scale, the exit codes) stay closed. See docs/contract.md.",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "schema_version",
     "tool",
@@ -104,7 +104,7 @@
     },
     "tool": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["name", "version"],
       "properties": {
         "name": { "type": "string" },
@@ -113,7 +113,7 @@
     },
     "controls": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["min_approvers", "checks"],
       "properties": {
         "min_approvers": { "type": "integer", "minimum": 0 },
@@ -130,7 +130,7 @@
     "verification": {
       "description": "What this run settled versus what it only recorded. The distinction is the point of the tool: a control that was not checked is never reported as passed.",
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["approvers_supplied", "verified", "recorded_not_verified"],
       "properties": {
         "approvers_supplied": {
@@ -150,8 +150,9 @@
       }
     },
     "controlId": {
+      "description": "Identifier of a control this run either settled or recorded. The set grows as controls are added, so a consumer must tolerate an identifier it does not recognise rather than reject the document. The values below are those evidence/0 defines today; they are examples, not a closed set.",
       "type": "string",
-      "enum": [
+      "examples": [
         "CAF-SDLC-002:tier",
         "CAF-SDLC-010:provenance-complete",
         "CAF-SDLC-010:ai-authorship",
@@ -164,7 +165,7 @@
     },
     "result": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["pass", "exit_code", "violations"],
       "properties": {
         "pass": { "type": "boolean", "description": "Whether the evidence settles every control it could check." },
