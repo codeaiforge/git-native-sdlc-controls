@@ -19,15 +19,17 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/codeaiforge/git-native-sdlc-controls/internal/contract"
 	"github.com/codeaiforge/git-native-sdlc-controls/internal/core"
 )
 
 const usage = `sdlc-controls — git-native SDLC controls
 
 Usage:
-  sdlc-controls tier --base <ref> [--head <ref>] --config <path> [options]
+  sdlc-controls tier    --base <ref> [--head <ref>] --config <path> [options]
+  sdlc-controls binding --config <path> [--policy <path>] [--format json|text]
 
-Options:
+tier options:
   --base <ref>          base ref of the change (required)
   --head <ref>          head ref of the change (default HEAD)
   --config <path>       component map YAML (required)
@@ -42,6 +44,10 @@ Options:
                         "nobody approved this" rather than "nobody asked". Set it
                         when the caller queried the forge and got an answer
   --repo <path>         repository root (default: current directory)
+
+binding prints the active policy the tier decision is made under — the tier
+table and the escalation rules, read from the same map and policy the engine
+tiers against. --format json emits schema policy-binding/0.
 
 Exit codes: 0 controls met, 1 controls not met, 2 usage or runtime error.
 `
@@ -60,6 +66,8 @@ func run(args []string) int {
 	switch args[0] {
 	case "tier":
 		return runTier(args[1:])
+	case "binding":
+		return runBinding(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return 0
@@ -160,7 +168,7 @@ func runTier(args []string) int {
 		return fail(err)
 	}
 
-	encoded, err := encodeEvidence(rec)
+	encoded, err := encodeJSON(contract.EvidenceFromCore(rec))
 	if err != nil {
 		return fail(err)
 	}
@@ -183,14 +191,80 @@ func runTier(args []string) int {
 	return 0
 }
 
-// encodeEvidence renders the record with HTML escaping off: the reasons contain
-// "->", and an evidence file is read by people and auditors, not a browser.
-func encodeEvidence(rec core.EvidenceRecord) ([]byte, error) {
+// runBinding prints the active policy binding. It exists so the policy that
+// produced a tier can be read by the same consumer that reads the evidence —
+// a record naming git-native-baseline@1 says little if the binding cannot be
+// fetched. It makes no decision and gates nothing: 0 on success, 2 on error.
+func runBinding(args []string) int {
+	fs := flag.NewFlagSet("binding", flag.ContinueOnError)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	var (
+		configPath = fs.String("config", "", "component map YAML")
+		policyPath = fs.String("policy", "", "tier policy YAML")
+		format     = fs.String("format", "text", "output format: text or json")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	// The map is required, not optional: the escalation rules are half declared
+	// in it. A binding printed without one would state defaults the run under
+	// test does not use.
+	if *configPath == "" {
+		fmt.Fprint(os.Stderr, "error: --config is required\n\n"+usage)
+		return 2
+	}
+
+	cmap, err := loadComponentMap(*configPath)
+	if err != nil {
+		return fail(err)
+	}
+	policy, err := loadPolicy(*policyPath)
+	if err != nil {
+		return fail(err)
+	}
+
+	b := contract.PolicyBindingFromCore(cmap, policy)
+	if *format == "json" {
+		encoded, err := encodeJSON(b)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Print(string(encoded))
+		return 0
+	}
+	printBinding(b)
+	return 0
+}
+
+func printBinding(b contract.PolicyBindingDTO) {
+	fmt.Printf("binding: %s\n", b.Binding)
+	fmt.Printf("schema:  %s\n", b.SchemaVersion)
+	for t := core.T0; t <= core.MaxTier; t++ {
+		c := b.Tiers[t.String()]
+		fmt.Printf("%s: min_approvers=%d checks=%s", t, c.MinApprovers, orNone(c.Checks))
+		if c.RequireOwningTeamReviewer {
+			fmt.Print(" owning_team_reviewer=true")
+		}
+		if c.IndependentApproverRequired {
+			fmt.Print(" independent_approver=true")
+		}
+		fmt.Println()
+	}
+	e := b.Escalation
+	fmt.Printf("escalation: shared=+%d breadth=+%d at >=%d unmatched_floor=%s (%s) map_change=%s cap=%s\n",
+		e.SharedIncrement, e.BreadthIncrement, e.BreadthThreshold,
+		e.UnmatchedPathTier, e.UnmatchedPathCriticality, e.MapChangeSelfEscalatesTo, e.Cap)
+}
+
+// encodeJSON renders a contract document with HTML escaping off: the reasons
+// contain "->", and an evidence file is read by people and auditors, not a
+// browser.
+func encodeJSON(doc any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(rec); err != nil {
+	if err := enc.Encode(doc); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
