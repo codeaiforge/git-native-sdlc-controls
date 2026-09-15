@@ -60,6 +60,63 @@ before any major bump. That step is deliberately not taken yet — the first rea
 will find something about the shape worth fixing, and fixing it is cheaper than a
 compatibility shim promised too early.
 
+## Open findings at major 0
+
+Major 0 exists to collect these. Recorded as found, from a caller that projects its
+component map out of a real build graph. None of them is worked around by patching the
+engine, and none is fixed yet.
+
+### `shared` is a boolean where the graph has a count
+
+A component with three dependents and one with three hundred both declare `shared: true`
+and both escalate by exactly `TierIncrement` — one tier. A caller that has computed real
+fan-in has nowhere to put it.
+
+This is the ceiling CAF-SDLC-002 already states, met by the first consumer able to do
+better. What is new is that the information now exists and the schema drops it.
+
+Note the near miss: `cross_repo_consumers` is already a list on a component, so the map
+*can* carry a set of dependents — but it is inert for tiering. It raises a warning and
+never moves the tier. A graph-backed caller writing fan-in there gets a record that
+mentions it and a tier that ignores it, which is worse than no field at all.
+
+Candidate shapes, neither chosen: a `fan_in: <int>` field, or a `shared` that accepts a
+threshold rather than a bool. The reason this is not a one-field change is that both
+reopen the escalation model — today every rule adds exactly one tier and the result is
+capped at `T3`. Proportional escalation from a count needs bands, and bands belong in the
+tier policy rather than the map, so the fix spans both schemas. Worth doing deliberately,
+at `evidence/1` and a versioned map schema, not as a patch.
+
+### A generated map cannot be governed
+
+Map governance assumes the map is a committed file: the CLI resolves `--config` and
+`--policy` to repo-relative paths, and a change to either self-escalates to `T3`. For a
+caller that *generates* the map from a build graph, the generated file may not be in the
+diff at all — the generator is, and governance cannot see it.
+
+Two precisions on where the gap actually is:
+
+- **The engine already expresses this.** `core.EvaluateInput.GovernedPaths` is a plain
+  `[]string` and will govern any path handed to it. What is missing is a way to fill it:
+  the CLI only ever populates it from `--config` and `--policy`, and the map has no way
+  to name the thing that produced it. A fix is a CLI flag and a map field, and touches
+  `internal/core` not at all.
+- **The workaround's real cost is the record, not the tier.** Declaring the generator as
+  an ordinary `criticality: critical` component does escalate to `T3`, so the gate behaves
+  correctly. But the evidence record then reads `generator criticality=critical -> base T3`
+  instead of `control map changed (...) -> self-escalate to T3`, and `affected_set` carries
+  an entry that is not a component. The decision is right and its stated reason is wrong,
+  which is the one failure mode this tool is built to avoid.
+
+### The component map has no published schema
+
+`evidence/0` and `policy-binding/0` are versioned artifacts under `schemas/`. The component
+map is not one: it is Go structs, `config/components.example.yaml`, and the prose in
+CAF-SDLC-002. So a finding "against the map schema" is currently a finding against three
+things that can disagree. Publishing the map as a versioned schema — and deciding whether
+it shares the evidence major or versions separately — is a prerequisite for acting on the
+two findings above.
+
 ## The honesty invariant, in machine-readable form
 
 The tool's purpose is the distinction between a control it **checked** and a control it

@@ -94,7 +94,10 @@ and `shared` flag — not from a computed dependency graph. The consequences are
 
 - a high fan-in component that nobody declared `shared: true` will be **under-tiered**;
 - a component whose real callers changed will not re-tier until someone edits the map;
-- `shared` is a boolean stand-in for what is really a fan-in count.
+- `shared` is a boolean stand-in for what is really a fan-in count — a component with three
+  dependents and one with three hundred escalate identically. A caller that has computed the
+  real number has nowhere to declare it; see the open findings in
+  [contract.md](../contract.md#open-findings-at-major-0).
 
 This is a deliberate trade: a computed graph is more accurate but needs per-language build-tool
 integration, which would end the tooling-agnostic property that makes this approach portable. The
