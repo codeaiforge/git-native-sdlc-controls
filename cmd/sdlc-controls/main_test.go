@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -366,4 +368,201 @@ func TestRunTier_JSONFormatWithCustomPolicy(t *testing.T) {
 	if got != 1 {
 		t.Errorf("runTier with min_approvers=2 and one approver = %d, want 1", got)
 	}
+}
+
+// captureStdout runs f with stdout redirected and returns what it printed. The
+// output formats are a published interface; a test that cannot read them can
+// only assert exit codes.
+func captureStdout(t *testing.T, f func() int) (string, int) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := os.Stdout
+	os.Stdout = w
+
+	code := f()
+
+	os.Stdout = saved
+	w.Close()
+	var buf strings.Builder
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	r.Close()
+	return buf.String(), code
+}
+
+// The text output is the v0.1.0 interface. 0.2.0 is additive: it added JSON
+// fields and a subcommand, and must not have moved a byte of this.
+func TestRunTier_TextGolden(t *testing.T) {
+	dir, base, head := gitRepo(t)
+	cfg := componentMap(t, dir)
+
+	got, code := captureStdout(t, func() int {
+		return runTier([]string{"--base", base, "--head", head, "--config", cfg, "--repo", dir,
+			"--change-id", "PR-1", "--author", "alice", "--approvers", "bob"})
+	})
+	if code != 0 {
+		t.Fatalf("runTier = %d, want 0", code)
+	}
+
+	want, err := os.ReadFile(filepath.Join("testdata", "tier-t0.txt"))
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("text output changed — it is the v0.1.0 interface:\n--- want ---\n%s\n--- got ---\n%s", want, got)
+	}
+}
+
+// Text and JSON are two renderings of one decision, not two decisions. If they
+// can disagree on the tier, the reasons, the required controls or the exit
+// code, one of them is lying to whoever reads it.
+func TestRunTier_TextAndJSONAgree(t *testing.T) {
+	dir, base, head := gitRepo(t)
+	cfg := componentMap(t, dir)
+	args := []string{"--base", base, "--head", head, "--config", cfg, "--repo", dir,
+		"--change-id", "PR-1", "--author", "alice", "--approvers", "bob"}
+
+	text, textCode := captureStdout(t, func() int { return runTier(args) })
+	raw, jsonCode := captureStdout(t, func() int { return runTier(append(args, "--format", "json")) })
+
+	if textCode != jsonCode {
+		t.Errorf("exit codes differ by format: text %d, json %d", textCode, jsonCode)
+	}
+
+	var doc struct {
+		Tier             string   `json:"tier"`
+		Reasons          []string `json:"reasons"`
+		ControlsEnforced struct {
+			MinApprovers int      `json:"min_approvers"`
+			Checks       []string `json:"checks"`
+		} `json:"controls_enforced"`
+		Result struct {
+			Pass     bool `json:"pass"`
+			ExitCode int  `json:"exit_code"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatalf("--format json did not emit valid JSON: %v\n%s", err, raw)
+	}
+
+	if doc.Result.ExitCode != jsonCode {
+		t.Errorf("result.exit_code = %d, but the process exited %d", doc.Result.ExitCode, jsonCode)
+	}
+	if doc.Result.Pass != (jsonCode == 0) {
+		t.Errorf("result.pass = %t with exit %d", doc.Result.Pass, jsonCode)
+	}
+	if !strings.Contains(text, "tier:    "+doc.Tier) {
+		t.Errorf("tier %q is not the one the text output states:\n%s", doc.Tier, text)
+	}
+	for _, r := range doc.Reasons {
+		if !strings.Contains(text, r) {
+			t.Errorf("reason %q is in the JSON but not in the text output", r)
+		}
+	}
+	if !strings.Contains(text, fmt.Sprintf("min_approvers=%d", doc.ControlsEnforced.MinApprovers)) {
+		t.Errorf("min_approvers disagrees between the formats:\n%s", text)
+	}
+	for _, c := range doc.ControlsEnforced.Checks {
+		if !strings.Contains(text, c) {
+			t.Errorf("check %q is in the JSON but not in the text output", c)
+		}
+	}
+}
+
+// A failing gate still has to emit its record: a consumer that only gets JSON
+// on success learns nothing about the changes that were actually blocked.
+func TestRunTier_JSONEmittedOnFailingGate(t *testing.T) {
+	dir, base, head := gitRepo(t)
+	cfg := componentMap(t, dir)
+
+	raw, code := captureStdout(t, func() int {
+		return runTier([]string{"--base", base, "--head", head, "--config", cfg, "--repo", dir,
+			"--format", "json", "--approvers-known"}) // queried the forge, nobody approved
+	})
+	if code != 1 {
+		t.Fatalf("runTier = %d, want 1 on a verified-empty approver set", code)
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		t.Fatalf("no JSON on a failing gate: %v\n%s", err, raw)
+	}
+	result, ok := doc["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("record has no result block: %s", raw)
+	}
+	if result["pass"] != false || result["exit_code"].(float64) != 1 {
+		t.Errorf("result = %v, want pass false and exit_code 1", result)
+	}
+	if len(result["violations"].([]any)) == 0 {
+		t.Error("a blocked change must name what it failed")
+	}
+}
+
+// The binding subcommand publishes the policy a tier decision was made under.
+// It gates nothing, so it never exits 1.
+func TestRunBinding(t *testing.T) {
+	dir, _, _ := gitRepo(t)
+	cfg := componentMap(t, dir)
+
+	t.Run("flag parsing", func(t *testing.T) {
+		tests := []struct {
+			name string
+			args []string
+			want int
+		}{
+			{"missing --config", []string{}, 2},
+			{"unknown flag", []string{"--config", cfg, "--nope"}, 2},
+			{"component map does not exist", []string{"--config", filepath.Join(dir, "missing.yaml")}, 2},
+			{"text", []string{"--config", cfg}, 0},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, code := captureStdout(t, func() int { return runBinding(tc.args) }); code != tc.want {
+					t.Errorf("runBinding(%v) = %d, want %d", tc.args, code, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("json states the tier table the engine tiers against", func(t *testing.T) {
+		raw, code := captureStdout(t, func() int {
+			return runBinding([]string{"--config", cfg, "--format", "json"})
+		})
+		if code != 0 {
+			t.Fatalf("runBinding = %d, want 0", code)
+		}
+		var doc struct {
+			SchemaVersion string `json:"schema_version"`
+			Binding       string `json:"binding"`
+			Tiers         map[string]struct {
+				MinApprovers                int  `json:"min_approvers"`
+				IndependentApproverRequired bool `json:"independent_approver_required"`
+			} `json:"tiers"`
+		}
+		if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+			t.Fatalf("binding --format json is not valid JSON: %v\n%s", err, raw)
+		}
+		if doc.SchemaVersion != "policy-binding/0" {
+			t.Errorf("schema_version = %q, want policy-binding/0", doc.SchemaVersion)
+		}
+		if doc.Binding != "git-native-baseline@1" {
+			t.Errorf("binding = %q", doc.Binding)
+		}
+		// The default policy is compiled in; the published table has to be it.
+		for tier, want := range defaultPolicy {
+			got := doc.Tiers[tier]
+			if got.MinApprovers != want.MinApprovers {
+				t.Errorf("%s min_approvers = %d, want %d", tier, got.MinApprovers, want.MinApprovers)
+			}
+			if got.IndependentApproverRequired != want.IndependentApproverRequired {
+				t.Errorf("%s independent_approver_required = %t, want %t",
+					tier, got.IndependentApproverRequired, want.IndependentApproverRequired)
+			}
+		}
+	})
 }
