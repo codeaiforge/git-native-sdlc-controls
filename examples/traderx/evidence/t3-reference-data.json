@@ -1,4 +1,9 @@
 {
+  "schema_version": "evidence/0",
+  "tool": {
+    "name": "sdlc-controls",
+    "version": "0.2.0"
+  },
   "change_id": "DEMO-t3-reference-data",
   "binding_used": "git-native-baseline@1",
   "tier": "T3",
@@ -26,9 +31,30 @@
   "accountable_approver": "bob",
   "approver_ne_author": true,
   "approver_count": 1,
+  "verification": {
+    "approvers_supplied": true,
+    "verified": [
+      "CAF-SDLC-002:tier",
+      "CAF-SDLC-011:approver-count",
+      "CAF-SDLC-011:independent-approver"
+    ],
+    "recorded_not_verified": [
+      "CAF-SDLC-010:ai-authorship",
+      "owning-team-reviewer",
+      "required-checks",
+      "deploy-approval"
+    ]
+  },
+  "result": {
+    "pass": false,
+    "exit_code": 1,
+    "violations": [
+      "T3 requires 2 approver(s), found 1"
+    ]
+  },
   "warnings": [
     "tier requires an owning-team reviewer (no owners declared in the component map): enforced by CODEOWNERS and branch protection, not verified by this run"
   ],
   "map_version": 1,
-  "computed_at": "2026-09-02T06:06:44.548462261Z"
+  "computed_at": "2026-09-15T09:39:31.76156328Z"
 }

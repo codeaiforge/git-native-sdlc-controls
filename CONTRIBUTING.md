@@ -9,8 +9,14 @@ $ make lint    # go vet ./...
 $ make demo    # ./scripts/demo.sh — tiers four changes in a throwaway TraderX-shaped repo
 ```
 
-Go 1.22 or later. The only dependency is `gopkg.in/yaml.v3`, and it is used above `internal/core`
-only.
+Go 1.22 or later. The binary has one dependency, `gopkg.in/yaml.v3`, used above `internal/core` only.
+A JSON Schema validator (`github.com/santhosh-tekuri/jsonschema/v6`) is a **test-only** dependency —
+it validates the emitted documents against the published schemas and must never reach the binary:
+
+```console
+$ go list -deps ./cmd/sdlc-controls | grep santhosh
+# should print nothing
+```
 
 ## The one architectural rule
 
@@ -29,6 +35,24 @@ A change to a control definition in `docs/controls/` or to the schemas in `confi
 what this repository asserts. State the reasoning in the pull request, and keep the stated ceiling of
 a control honest — if a change makes a control weaker in some case, say so in the doc rather than in
 the PR description alone.
+
+## Changes to the published contract
+
+`internal/contract` and `schemas/` are an interface other people depend on. The rules, in full in
+[docs/contract.md](docs/contract.md):
+
+- **Adding a field** is fine in any release. Add it to the DTO, the schema, and
+  `docs/evidence-schema.md` together.
+- **Removing or renaming** one means a new schema major (`evidence/1`), a new directory under
+  `schemas/`, and a note in the CHANGELOG. Do not edit `evidence/0` to mean something else.
+- Never marshal a `core` type straight onto the wire. The explicit DTO mapping is the review
+  chokepoint that stops an engine refactor from silently reshaping a published document.
+- Never let a control that was not checked reach the wire looking checked. `verification.verified`
+  and `verification.recorded_not_verified` are derived from engine state, and every control belongs
+  to exactly one of them.
+
+The text output is a contract too, and `cmd/sdlc-controls/testdata/tier-t0.txt` is a golden of the
+v0.1.0 output. If a change makes that test fail, the change is breaking — not the test.
 
 ## AI-assisted commits
 

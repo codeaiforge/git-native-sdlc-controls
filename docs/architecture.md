@@ -4,7 +4,9 @@
 
 ```text
 cmd/sdlc-controls        CLI — gathers inputs, does all I/O, formats output
+  ├── internal/contract  the serialization boundary — versioned wire DTOs
   └── internal/core      the engine — pure functions, no I/O, no CI knowledge
+schemas/                 the published JSON Schemas those DTOs satisfy
 action.yml               GitHub Action metadata (at the root; see below)
 action/Dockerfile        the image it runs: builds the same binary, no logic
 ```
@@ -47,6 +49,32 @@ flowchart LR
 2. `ComputeTier` applies the CAF-SDLC-002 algorithm → tier + ordered reasons.
 3. `ParseProvenance` reads the CAF-SDLC-010 trailers off the commit messages.
 4. `BuildEvidence` assembles the record; `Violations()` reports what the evidence itself settles.
+5. `contract.EvidenceFromCore` maps that record onto the versioned wire DTO; the CLI renders it as
+   text or JSON and picks an exit code.
+
+## The serialization boundary
+
+```text
+internal/core       domain types (EvidenceRecord, Tier, TierControls) — standard library only
+   ↓  one way
+internal/contract   explicit wire DTOs + mapping; asserts schema_version
+   ↓
+cmd/sdlc-controls   renders text or JSON, chooses an exit code
+```
+
+`internal/core` does not import `internal/contract`. The dependency points one way, so the engine
+stays free of wire concerns and the published shape stays free to version on its own schedule.
+
+The DTOs are written out by hand and mapped field by field rather than derived by tagging the core
+structs. That is the point rather than an oversight: the JSON is an interface other people depend on,
+and a rename inside the engine has to break the mapping — and show up in review — instead of silently
+changing what a consumer receives. The mapping is also where `schema_version` is asserted, and where
+the honesty invariant is projected into `verification.verified` / `verification.recorded_not_verified`.
+
+The binary carries three independent version axes — binary, schema, policy binding. See
+[contract.md](contract.md) for what each one means and when it moves. The JSON Schema validator used
+to check the emitted documents is a **test-only** dependency:
+`go list -deps ./cmd/sdlc-controls` never names it.
 
 ## Why the CLI is the product
 
@@ -81,6 +109,10 @@ is exactly what the runner does, which is why CI builds it on every pull request
 | approver count, independent approver | the forge's branch protection; verified here when an approver set is available |
 | owning-team reviewer | CODEOWNERS and branch protection; recorded here as required-but-unverified, naming the owners |
 | lint / sast / secrets / deps | the CI jobs the policy names |
+
+Every row of that table appears in the evidence record's `verification` block, on one side or the
+other: `verified` for what this run settled, `recorded_not_verified` for the rest. The prose
+`warnings` say the same thing for a human reader.
 
 The tool computes and records the requirement. It does not pretend to be the merge button. What it will not do is record a control it did not check as one that passed: everything in the right-hand column that this tool does not enforce leaves a warning in the evidence saying who does.
 

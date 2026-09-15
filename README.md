@@ -6,7 +6,9 @@
 A git-native, tooling-agnostic reference implementation of SDLC controls-as-code: it assigns a risk
 tier to every change and enforces proportionate controls in CI, using only git primitives.
 
-Reference implementation, not a product.
+Reference implementation, not a product. It does publish a versioned JSON contract for the evidence
+it emits, so other tools can consume it — that contract is **experimental until v1.0**; see
+[docs/contract.md](docs/contract.md).
 
 ## What it does
 
@@ -137,6 +139,63 @@ range and writes the evidence record, but it cannot verify approvals — there i
 read — so it records those controls as required and unverified. Only a pull request can settle them.
 The badge above is the mirror's history of those runs.
 
+## Machine-readable output
+
+Every run can emit its evidence record as JSON instead of text, for a consumer rather than a reader:
+
+```console
+$ sdlc-controls tier --base main --head HEAD --config config/components.yaml --format json
+{
+  "schema_version": "evidence/0",
+  "tool": { "name": "sdlc-controls", "version": "0.2.0" },
+  "change_id": "main..HEAD",
+  "binding_used": "git-native-baseline@1",
+  "tier": "T3",
+  "affected_set": ["payment-authorization", "shared-contracts"],
+  "reasons": ["payment-authorization criticality=critical -> base T3",
+              "shared-contracts shared=true -> +1 (capped)"],
+  "verification": {
+    "approvers_supplied": false,
+    "verified": ["CAF-SDLC-002:tier"],
+    "recorded_not_verified": ["CAF-SDLC-010:ai-authorship", "CAF-SDLC-011:approver-count",
+                              "CAF-SDLC-011:independent-approver", "owning-team-reviewer",
+                              "required-checks", "deploy-approval"]
+  },
+  "result": { "pass": true, "exit_code": 0, "violations": [] }
+}
+```
+
+Abridged — the full record also carries `unmatched_set`, `controls_enforced`, the CAF-SDLC-010 and
+CAF-SDLC-011 fields, `warnings`, `map_version` and `computed_at`. Every field is in
+[docs/evidence-schema.md](docs/evidence-schema.md).
+
+`verification` is the warnings in structured form: what this run actually checked, and what it
+recorded as required and could not. A consumer never has to read English to find out that an approver
+control went unverified, and there is no field anywhere that flattens the two into a bare pass.
+
+The policy those decisions were made under is readable too, projected from the same map and tier
+policy the engine tiers against:
+
+```console
+$ sdlc-controls binding --config config/components.yaml --format json
+```
+
+Both documents have a published JSON Schema, committed in [schemas/](schemas/) and validated in CI
+against what the tool actually emits:
+
+| Document | Schema |
+|---|---|
+| evidence record | [`schemas/evidence/0`](schemas/evidence/0/evidence.schema.json) |
+| policy binding | [`schemas/policy-binding/0`](schemas/policy-binding/0/policy-binding.schema.json) |
+
+Three version axes move independently, and a consumer should keep them apart: the **binary**
+(`tool.version`, SemVer), the **schema** (`schema_version` — the document's shape), and the **policy
+binding** (`binding_used` — the algorithm and semantics a decision was made under). A patch release of
+the binary is not a contract change, and a schema fix does not mean the tiering moved.
+The schemas are experimental at major 0 while the binary is 0.x: fields may be added at any time, a
+consumer must ignore ones it does not know, and nothing will be removed or renamed without bumping to
+`evidence/1`. Full policy in [docs/contract.md](docs/contract.md).
+
 ## The honest ceiling
 
 Blast radius here is a **declared-topology approximation**, not a computed dependency graph. A
@@ -177,7 +236,10 @@ go test ./... -cover    # with coverage
 `internal/core` is table-driven throughout: the tier algorithm, the T3 cap, the unmatched-path
 fail-safe, trailer parsing and the independent-approver control each have their own cases.
 `cmd/sdlc-controls` covers flag parsing, git invocation, the exit-code contract and
-`--evidence-out` against throwaway repositories built in the test itself.
+`--evidence-out` against throwaway repositories built in the test itself, plus a golden that holds
+the text output byte-identical to v0.1.0. `internal/contract` validates the JSON it emits — and the
+example records committed under `examples/` — against the published schemas; that validator is a
+test-only dependency and never enters the binary.
 
 The badge states a floor, not a snapshot, and CI fails the build if coverage falls below it — a
 number nothing checks is a claim rather than evidence, which is the same standard this tool holds

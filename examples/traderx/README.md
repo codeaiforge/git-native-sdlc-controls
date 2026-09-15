@@ -145,6 +145,54 @@ they were not the author:
   "approver_count": 2,
 ```
 
+### The same run, for a consumer rather than a reader
+
+Add `--format json` and the decision comes back as schema `evidence/0` — the same tier, the same
+ordered reasons, the same exit code:
+
+```console
+$ sdlc-controls tier --base main --head refdata-ai --config components.yaml --change-id DEMO-t3-ai-self-approved --author alice --approvers alice --format json
+{
+  "schema_version": "evidence/0",
+  "tool": { "name": "sdlc-controls", "version": "0.2.0" },
+  "change_id": "DEMO-t3-ai-self-approved",
+  "binding_used": "git-native-baseline@1",
+  "tier": "T3",
+  "affected_set": ["reference-data"],
+  "reasons": ["reference-data criticality=high -> base T2", "reference-data shared=true -> +1"],
+  "ai_assisted": true,
+  "ai_tool": "claude-code",
+  "approver_ne_author": false,
+  "approver_count": 1,
+  "verification": {
+    "approvers_supplied": true,
+    "verified": ["CAF-SDLC-002:tier", "CAF-SDLC-010:provenance-complete",
+                 "CAF-SDLC-011:approver-count", "CAF-SDLC-011:independent-approver"],
+    "recorded_not_verified": ["CAF-SDLC-010:ai-authorship", "owning-team-reviewer",
+                              "required-checks", "deploy-approval"]
+  },
+  "result": {
+    "pass": false,
+    "exit_code": 1,
+    "violations": ["T3 requires 2 approver(s), found 1",
+                   "T3 requires an approver distinct from the author (CAF-SDLC-011)"]
+  }
+}
+```
+
+Abridged; the committed [`evidence/t3-ai-self-approved.json`](evidence/t3-ai-self-approved.json) is
+the whole record. Note what `verification` keeps apart: the approver rules were **checked**, and
+failed. The owning-team reviewer and the named checks were **recorded and not checked** — they belong
+to branch protection and to CI jobs. And `CAF-SDLC-010:ai-authorship` is never verified by anyone
+here: the trailers are a declaration, so the tool checks that an AI-assisted change names its tool,
+not that an unlabelled one was written by a human.
+
+To see the policy those tiers came from:
+
+```console
+$ sdlc-controls binding --config components.yaml --format json
+```
+
 ## What the tool refuses to claim
 
 The owning-team warning survives every T3 run above, the passing one included. Expanding a team handle
