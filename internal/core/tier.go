@@ -67,12 +67,17 @@ func ComputeTier(affected []Component, unmatched []string, m ComponentMap) (Tier
 	return tier, reasons
 }
 
+// TierIncrement is the single step an escalation rule (shared, breadth) adds.
+// Named so the serialized policy binding can state the engine's own value rather
+// than carry a second copy of it. See internal/contract/policybinding.go.
+const TierIncrement = 1
+
 // escalate raises a tier by one, capped at T3, and records why.
 func escalate(t Tier, reasons []string, reason string) (Tier, []string) {
 	if t >= MaxTier {
 		return MaxTier, append(reasons, reason+" (capped)")
 	}
-	return t + 1, append(reasons, reason)
+	return t + TierIncrement, append(reasons, reason)
 }
 
 // UnmatchedPathTier returns the configured fail-safe class for undeclared paths.

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/codeaiforge/git-native-sdlc-controls/main/schemas/policy-binding/0/policy-binding.schema.json",
+  "title": "SDLC controls policy binding",
+  "description": "The active policy that produced a tier: the tier table and the CAF-SDLC-002 escalation rules, projected from the same map and policy the engine tiers against. Emitted by `sdlc-controls binding --format json`.",
+  "x-status": "experimental",
+  "x-stability": "Major version 0 while the binary is 0.x. Fields may be added at any time; a consumer must ignore unknown fields. Removals or renames will bump the schema major to policy-binding/1. See docs/contract.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "binding", "tiers", "escalation", "map_version"],
+  "properties": {
+    "schema_version": { "const": "policy-binding/0" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "binding": {
+      "type": "string",
+      "description": "The engine binding: the tiering algorithm and the evidence shape, e.g. git-native-baseline@1. Unaffected by --policy — the tier table below carries the policy instance."
+    },
+    "tiers": {
+      "description": "Required controls per tier. Every tier T0..T3 is present: a missing entry is rejected at load time so it can never read as 'no controls required'.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["T0", "T1", "T2", "T3"],
+      "properties": {
+        "T0": { "$ref": "#/$defs/controls" },
+        "T1": { "$ref": "#/$defs/controls" },
+        "T2": { "$ref": "#/$defs/controls" },
+        "T3": { "$ref": "#/$defs/controls" }
+      }
+    },
+    "escalation": { "$ref": "#/$defs/escalation" },
+    "map_version": { "type": "integer", "description": "`version` of the component map this binding was projected from." }
+  },
+  "$defs": {
+    "tier": { "type": "string", "enum": ["T0", "T1", "T2", "T3"] },
+    "criticality": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_approvers", "checks"],
+      "properties": {
+        "min_approvers": { "type": "integer", "minimum": 0 },
+        "checks": { "type": "array", "items": { "type": "string" } },
+        "deploy_approval": { "type": "string" },
+        "require_owning_team_reviewer": { "type": "boolean" },
+        "independent_approver_required": { "type": "boolean" }
+      }
+    },
+    "escalation": {
+      "description": "CAF-SDLC-002 rules that move a change off its base tier. A declared-topology approximation of blast radius, not a computed dependency graph.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unmatched_path_criticality",
+        "unmatched_path_tier",
+        "shared_increment",
+        "breadth_threshold",
+        "breadth_increment",
+        "map_change_self_escalates_to",
+        "cap"
+      ],
+      "properties": {
+        "unmatched_path_criticality": {
+          "description": "Fail-safe class the component map declares for a changed path that matches nothing.",
+          "$ref": "#/$defs/criticality"
+        },
+        "unmatched_path_tier": {
+          "description": "Tier that criticality resolves to — the floor applied when unmatched paths are present.",
+          "$ref": "#/$defs/tier"
+        },
+        "shared_increment": {
+          "type": "integer",
+          "description": "Added once when any affected component is declared shared."
+        },
+        "breadth_threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Affected-component count at which breadth_increment applies. 0 disables the rule."
+        },
+        "breadth_increment": { "type": "integer" },
+        "map_change_self_escalates_to": {
+          "description": "Tier a change to the component map or tier policy itself takes.",
+          "$ref": "#/$defs/tier"
+        },
+        "cap": { "description": "Ceiling every escalation is clamped to.", "$ref": "#/$defs/tier" }
+      }
+    }
+  }
+}
