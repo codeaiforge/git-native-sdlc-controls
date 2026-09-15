@@ -50,8 +50,26 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Formatted
+        run: |
+          unformatted=$(gofmt -l .)
+          [ -z "$unformatted" ] || { echo "gofmt -l reports:"; echo "$unformatted"; exit 1; }
+
+      # internal/contract's tests validate the JSON the tool emits — and the
+      # evidence records committed under examples/ — against the schemas in
+      # schemas/. A schema that no longer describes the output fails here.
       - name: Test
         run: go test ./... -coverprofile=cover.out
+
+      # The JSON Schema validator is a test dependency and has to stay one: the
+      # release artifact is a single static binary, and a contract check has no
+      # business shipping inside the thing it checks.
+      - name: The schema validator is absent from the binary
+        run: |
+          if go list -deps ./cmd/sdlc-controls | grep -q santhosh-tekuri; then
+            echo "the JSON Schema validator reached the binary's import graph"
+            exit 1
+          fi
 
       # The README badge states a floor rather than an exact figure: raising
       # coverage needs no README edit, and dropping below the advertised number

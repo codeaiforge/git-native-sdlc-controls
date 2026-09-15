@@ -19,9 +19,19 @@ components:
     owners: ["@codeaiforge/maintainers"]
 
   - id: control-definitions
-    match: ["docs/controls/**", "docs/evidence-schema.md"]
+    match: ["docs/controls/**", "docs/evidence-schema.md", "docs/contract.md"]
     criticality: high
     shared: false
+    owners: ["@codeaiforge/maintainers"]
+
+  # The published wire contract: the DTOs and the schemas that describe them.
+  # Shared because it is the interface consumers depend on — a change here
+  # reaches every one of them, which is exactly what `shared` is a stand-in for.
+  # The DTO and its schema move together, so they are one component, not two.
+  - id: contract
+    match: ["internal/contract/**", "schemas/**"]
+    criticality: high
+    shared: true
     owners: ["@codeaiforge/maintainers"]
 
   - id: control-config
