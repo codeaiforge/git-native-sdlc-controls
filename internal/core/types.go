@@ -126,6 +126,29 @@ type ComponentMap struct {
 	Version    int         `yaml:"version" json:"version"`
 	Defaults   Defaults    `yaml:"defaults" json:"defaults"`
 	Components []Component `yaml:"components" json:"components"`
+
+	// Provenance says where this map came from. Optional, and meaningful only
+	// for a map that something else produces.
+	Provenance MapProvenance `yaml:"provenance,omitempty" json:"provenance,omitempty"`
+}
+
+// MapProvenance records how a component map was produced.
+//
+// Map governance assumes the map is a file in the diff. For a map projected out
+// of a build graph that assumption fails: the generated file may not be
+// committed at all, and the thing worth governing is whatever produced it. This
+// is how such a map says so itself, rather than the fact being smuggled in as an
+// ordinary critical component — which reaches the right tier while making the
+// record state the wrong reason for it.
+type MapProvenance struct {
+	// GeneratedBy names the paths that produce this map — the generator, and
+	// any input it reads that would change the result. Repository-relative, in
+	// the form a diff names them. A change to any of them self-escalates
+	// exactly as a change to the map itself does.
+	//
+	// Its presence is also the declaration that the map is generated: a
+	// hand-authored map leaves it empty.
+	GeneratedBy []string `yaml:"generated_by,omitempty" json:"generated_by,omitempty"`
 }
 
 // ValidateMap rejects a map that cannot be reasoned about: an unrecognised
@@ -143,6 +166,20 @@ func ValidateMap(m ComponentMap) error {
 	}
 	if d := m.Defaults.UnmatchedPathTier; d != "" && !d.Valid() {
 		return fmt.Errorf("defaults.unmatched_path_tier %q is not one of low|medium|high|critical", d)
+	}
+	// A governed path is compared against the diff literally, so one that could
+	// never appear in a diff governs nothing. Rejecting it here is the whole
+	// point: a typo in generated_by would otherwise read as a governed map and
+	// behave as an ungoverned one.
+	for i, p := range m.Provenance.GeneratedBy {
+		switch {
+		case strings.TrimSpace(p) == "":
+			return fmt.Errorf("provenance.generated_by[%d] is empty", i)
+		case strings.HasPrefix(p, "/"):
+			return fmt.Errorf("provenance.generated_by[%d] %q is absolute: a diff names paths relative to the repository root", i, p)
+		case p == ".." || strings.HasPrefix(p, "../"):
+			return fmt.Errorf("provenance.generated_by[%d] %q leaves the repository: governance cannot see it", i, p)
+		}
 	}
 	seen := make(map[string]struct{}, len(m.Components))
 	for i, c := range m.Components {

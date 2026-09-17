@@ -18,6 +18,7 @@
       "type": "integer",
       "minimum": 0
     },
+    "provenance": { "$ref": "#/$defs/provenance" },
     "defaults": { "$ref": "#/$defs/defaults" },
     "components": {
       "description": "Every declared component. At least one: a map declaring none can never match a path, so the engine rejects it rather than tiering everything through the unmatched-path floor.",
@@ -31,6 +32,19 @@
       "description": "Declared blast-radius class, mapped onto the tier scale as low=T0, medium=T1, high=T2, critical=T3. Closed on purpose: the algorithm fixes this scale, so an unrecognised value is a typo. The engine fails such a value safe to the top of the scale rather than the bottom, and rejects it at load time.",
       "type": "string",
       "enum": ["low", "medium", "high", "critical"]
+    },
+    "provenance": {
+      "description": "Where this map came from. Optional, and meaningful only for a map something else produces. Map governance otherwise assumes the map is a file in the diff, which fails for a map projected out of a build graph: the generated file may not be committed, and the thing worth governing is whatever produced it.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "generated_by": {
+          "description": "Paths that produce this map — the generator, and any input it reads that would change the result. Repository-relative, in the form a diff names them: absolute paths and paths leaving the repository are rejected, because a path that can never appear in a diff governs nothing. A change to any of them self-escalates exactly as a change to the map itself does. Presence is also the declaration that the map is generated; a hand-authored map omits it. The engine additionally checks each path exists, because one that does not would leave a map that looks governed and is not.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
     },
     "defaults": {
       "description": "Map-wide knobs the tier algorithm reads.",
@@ -82,5 +96,5 @@
       }
     }
   },
-  "x-engine-enforced": "Two rules this schema cannot express, both checked by core.ValidateMap and both a hard load-time error: component ids must be unique within the map, and an unrecognised schema_version is refused rather than read as component-map/0."
+  "x-engine-enforced": "Rules this schema cannot express, all checked at load time and all a hard error rather than a warning: component ids must be unique within the map; an unrecognised schema_version is refused rather than read as component-map/0; and every path in provenance.generated_by must exist in the repository under test, since a declared generator that is not there would leave a map that looks governed and is not."
 }

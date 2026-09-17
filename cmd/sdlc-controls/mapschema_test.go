@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -191,5 +193,106 @@ func TestAbsentSchemaVersionStillLoads(t *testing.T) {
 	}
 	if m.SchemaVersion != "" {
 		t.Errorf("schema_version = %q, want empty", m.SchemaVersion)
+	}
+}
+
+// A generated map governs whatever produced it. Without this, the generator is
+// an ordinary file: changing it reshapes every tier in the repository and the
+// gate says nothing.
+func TestGeneratedMapGovernsItsGenerator(t *testing.T) {
+	dir, base, _ := gitRepo(t)
+
+	// A generator in the repo, and a map that declares it produces the map.
+	gen := filepath.Join(dir, "tools", "gen-map.py")
+	if err := os.MkdirAll(filepath.Dir(gen), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gen, []byte("# projects the map from the build graph\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "components.yaml")
+	body := "schema_version: component-map/0\nversion: 1\n" +
+		"provenance:\n  generated_by: [\"tools/gen-map.py\"]\n" +
+		"defaults:\n  unmatched_path_tier: low\n  breadth_threshold: 0\n" +
+		"components:\n  - id: docs\n    match: [\"**/*.txt\", \"**/*.py\"]\n    criticality: low\n    shared: false\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	git("add", "-A")
+	git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "add the generator and its map")
+
+	// Touch the generator: nothing else changes, and the map itself is untouched.
+	if err := os.WriteFile(gen, []byte("# now weights by fan-in\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "-A")
+	git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "change how the map is generated")
+
+	out, code := captureStdout(t, func() int {
+		return runTier([]string{"--base", base, "--config", cfg, "--repo", dir,
+			"--change-id", "PR-gen", "--author", "alice", "--approvers", "bob,carol"})
+	})
+	if code != 0 {
+		t.Fatalf("runTier = %d, want 0\n%s", code, out)
+	}
+	if !strings.Contains(out, "tier:    T3") {
+		t.Errorf("a change to the generator must self-escalate to T3:\n%s", out)
+	}
+	if !strings.Contains(out, "tools/gen-map.py") {
+		t.Errorf("the reason must name the generator that changed, not merely reach the tier:\n%s", out)
+	}
+	if !strings.Contains(out, "self-escalate") {
+		t.Errorf("the escalation must be stated as map governance, not as a component's criticality:\n%s", out)
+	}
+}
+
+// A declared generator that is not in the repository matches nothing in any
+// diff, so governance would never fire and the map would look governed while
+// being ungoverned. That has to fail at load, not pass quietly.
+func TestMissingGeneratorIsAnError(t *testing.T) {
+	dir, base, head := gitRepo(t)
+	cfg := filepath.Join(dir, "components.yaml")
+	body := "version: 1\nprovenance:\n  generated_by: [\"tools/not-here.py\"]\n" +
+		"defaults:\n  unmatched_path_tier: low\n  breadth_threshold: 0\n" +
+		"components:\n  - id: docs\n    match: [\"*.txt\"]\n    criticality: low\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := runTier([]string{"--base", base, "--head", head, "--config", cfg, "--repo", dir}); got != 2 {
+		t.Errorf("runTier with a missing generator = %d, want 2", got)
+	}
+}
+
+// A path that can never appear in a diff governs nothing, so the engine refuses
+// it rather than accepting a declaration that does not work.
+func TestUndiffablePathsRejected(t *testing.T) {
+	tests := []struct{ name, path string }{
+		{"absolute", "/etc/gen.py"},
+		{"escapes the repository", "../elsewhere/gen.py"},
+		{"empty", "  "},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := core.ComponentMap{
+				Version:    1,
+				Provenance: core.MapProvenance{GeneratedBy: []string{tc.path}},
+				Components: []core.Component{{ID: "a", Match: []string{"*.go"}, Criticality: core.CriticalityLow}},
+			}
+			if err := core.ValidateMap(m); err == nil {
+				t.Errorf("ValidateMap accepted generated_by %q, which no diff can name", tc.path)
+			}
+		})
 	}
 }

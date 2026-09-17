@@ -151,6 +151,16 @@ func runTier(args []string) int {
 		}
 	}
 
+	// A generated map governs whatever produced it. The map declares those paths
+	// itself, already relative to the repository root, so they join the governed
+	// set unchanged — see core.MapProvenance for why the map is the right place
+	// to declare them.
+	if gen, err := generatorPaths(*repo, cmap); err != nil {
+		return fail(err)
+	} else {
+		governed = append(governed, gen...)
+	}
+
 	rec, err := core.Evaluate(core.EvaluateInput{
 		ChangeID:          id,
 		ChangedPaths:      changedPaths,
@@ -309,6 +319,26 @@ func orNone(s []string) string {
 func fail(err error) int {
 	fmt.Fprintf(os.Stderr, "error: %v\n", err)
 	return 2
+}
+
+// generatorPaths returns the repository-relative paths a generated map declares
+// as producing it, having checked each one is really there.
+//
+// The check is the point. Governance compares declarations against the diff
+// literally, so a generator path that does not exist matches nothing, fires
+// nothing, and leaves a map that looks governed and is not. That is the failure
+// this control exists to prevent, so it is an error at load rather than a
+// warning in the record — the same standing a criticality typo already has.
+func generatorPaths(repo string, m core.ComponentMap) ([]string, error) {
+	var out []string
+	for _, p := range m.Provenance.GeneratedBy {
+		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(p))); err != nil {
+			return nil, fmt.Errorf("provenance.generated_by names %s, which is not in the repository: "+
+				"governance would silently never fire for it", p)
+		}
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 func loadComponentMap(path string) (core.ComponentMap, error) {

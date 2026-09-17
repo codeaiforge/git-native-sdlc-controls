@@ -97,26 +97,42 @@ It does **not** reach the evidence contract. `reasons` is a list of strings, so 
 rule changes what a reason says and no field of `evidence/0`. This lands as a map schema
 bump plus a policy addition, with the evidence contract untouched.
 
-### A generated map cannot be governed
+### A generated map cannot be governed — closed
 
-Map governance assumes the map is a committed file: the CLI resolves `--config` and
-`--policy` to repo-relative paths, and a change to either self-escalates to `T3`. For a
-caller that *generates* the map from a build graph, the generated file may not be in the
-diff at all — the generator is, and governance cannot see it.
+Map governance assumed the map was a committed file: the CLI resolved `--config` and
+`--policy` to repository-relative paths, and a change to either self-escalated to `T3`.
+For a caller that *generates* the map from a build graph that assumption failed — the
+generated file might not be in the diff at all, and the thing worth governing was the
+generator.
 
-Two precisions on where the gap actually is:
+Closed by letting the map say so itself, in a `provenance.generated_by` block. Those paths
+join the governed set, so a change to the generator self-escalates exactly as a change to
+the map does, and its presence is also the declaration that the map is generated.
 
-- **The engine already expresses this.** `core.EvaluateInput.GovernedPaths` is a plain
-  `[]string` and will govern any path handed to it. What is missing is a way to fill it:
-  the CLI only ever populates it from `--config` and `--policy`, and the map has no way
-  to name the thing that produced it. A fix is a CLI flag and a map field, and touches
-  `internal/core` not at all.
-- **The workaround's real cost is the record, not the tier.** Declaring the generator as
-  an ordinary `criticality: critical` component does escalate to `T3`, so the gate behaves
-  correctly. But the evidence record then reads `generator criticality=critical -> base T3`
-  instead of `control map changed (...) -> self-escalate to T3`, and `affected_set` carries
-  an entry that is not a component. The decision is right and its stated reason is wrong,
-  which is the one failure mode this tool is built to avoid.
+The fix is where the finding said it would be. `internal/core` gained the field and its
+validation but not a line of governance logic: `GovernedPaths` already governed any path it
+was handed, and the gap was only in filling it.
+
+What this buys is the record, not the tier. The workaround — declaring the generator as an
+ordinary `criticality: critical` component — already reached `T3`. What it could not do was
+say why:
+
+```text
+before:  app criticality=low -> base T0
+         generator criticality=critical -> base T3      # and a component that is not one
+after:   app criticality=low -> base T0
+         control map changed (tools/gen-map.py) -> self-escalate to T3
+```
+
+Two guards came with it, both hard errors rather than warnings. A path that no diff could
+ever name — absolute, or leaving the repository — is refused by `ValidateMap`. And a
+declared generator that is not in the repository fails at load, because it would match
+nothing, fire nothing, and leave a map that looks governed and is not.
+
+Still open at the edge: a map produced by something with no path in the repository at all —
+an external service — has nothing to declare, and governance cannot reach it. Such a map is
+in the same position as one kept outside the repository under test, which the evidence
+already reports as ungovernable.
 
 ### The component map has no published schema — closed
 
@@ -137,16 +153,18 @@ JSON Schema 2020-12 cannot express, and refusing an unrecognised `schema_version
 
 ### Where this goes next
 
-Recorded, in the order they would be taken, none of them committed to a date:
+Recorded, in the order they would be taken. The first two are done; the third is
+deliberately parked:
 
 1. ~~**Publish the component map as a versioned schema.**~~ **Done** —
    [`component-map/0`](../schemas/component-map/0/component-map.schema.json), with the
    `version` collision settled and the schema held to agreeing with the engine by test.
    It was the prerequisite for the rest: a caller that *generates* a map needs a contract
    to generate against.
-2. **Map provenance.** One block in the map schema saying where the map came from and what
-   governs it, which the CLI folds into `GovernedPaths`. This closes the second finding
-   outright, and `internal/core` does not change: it already governs any path it is given.
+2. ~~**Map provenance.**~~ **Done** — `provenance.generated_by` in
+   [`component-map/0`](../schemas/component-map/0/component-map.schema.json), folded into
+   `GovernedPaths` by the CLI. The prediction held: core gained a field and no governance
+   logic.
 3. **`fan_in` and policy bands.** Last, and only once a second caller confirms the shape.
    This is the only step that touches the engine, because it replaces "every rule adds
    exactly one tier".

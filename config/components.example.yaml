@@ -13,6 +13,13 @@
 #
 # schema_version: component-map/0
 version: 1
+
+# If something generates this file, say so. Those paths are then governed exactly
+# as this map is: change the generator and the tier self-escalates. Omit the block
+# entirely for a hand-authored map.
+#
+# provenance:
+#   generated_by: ["tools/gen-map.py"]
 defaults:
   unmatched_path_tier: high
   breadth_threshold: 4

@@ -114,6 +114,14 @@ honest; they do not make it a graph.
 - A control file that cannot be expressed that way — a map kept **outside** the repository under test,
   as when one map tiers several repos — is reported in the evidence as ungovernable. Governance
   genuinely cannot apply to it, and an absent escalation must not read as "the map was untouched".
+- A map that something else **generates** governs whatever produced it. The map declares those
+  paths itself, in `provenance.generated_by`, and a change to any of them self-escalates exactly
+  as a change to the map does. Without this the generator is an ordinary file: changing it
+  reshapes every tier in the repository while the gate says nothing. Declaring the generator as
+  an ordinary `critical` component reaches the same tier, but makes the evidence state the wrong
+  reason for it — the failure this control exists to prevent. A declared path that no diff could
+  name, or that is not in the repository, is an error at load rather than a governed path that
+  silently never fires.
 - With no `--policy`, the built-in baseline policy is in force. It is compiled into the binary, so no
   file in the diff can change it and there is nothing to govern.
 - Any unmatched path is reported as a warning that the map has drifted from the repository.

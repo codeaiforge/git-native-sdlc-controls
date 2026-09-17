@@ -18,6 +18,16 @@ binary; the JSON schemas are versioned independently — see [docs/contract.md](
   read on a guess, which would under-tier silently. It settles the collision with `version`,
   which stays what it always was: the revision of the declared topology, recorded in evidence
   as `map_version` for reproducibility.
+- `provenance.generated_by` on the component map: the paths that produce a generated map, which
+  join the governed set so a change to the generator self-escalates exactly as a change to the
+  map does. Map governance previously assumed the map was a committed file, which fails for a map
+  projected out of a build graph — the generated file may not be in the diff, and the generator is.
+  Declaring the generator as an ordinary `critical` component reached the same tier but made the
+  evidence state the wrong reason for it.
+- Two hard errors rather than warnings, both because a governed path that never matches leaves a
+  map that looks governed and is not: `ValidateMap` refuses a `generated_by` path no diff could
+  name (absolute, or leaving the repository), and the CLI refuses one that is not in the
+  repository under test.
 - A test asserting `component-map/0` and `core.ValidateMap` reject the same maps. A schema a
   generator can satisfy while the engine refuses the result is worse than no schema. The two
   rules JSON Schema cannot express — id uniqueness, and refusing an unknown `schema_version` —
@@ -27,8 +37,11 @@ binary; the JSON schemas are versioned independently — see [docs/contract.md](
 
 - Additive. Every existing map keeps loading unchanged, and no evidence field moved: closing
   this finding needed no change to `evidence/0`.
-- First of the three open findings recorded in [docs/contract.md](docs/contract.md) to be
-  closed. The other two — fan-in as a count, and governing a generated map — remain open.
+- Two of the three open findings recorded in [docs/contract.md](docs/contract.md) are now closed.
+  The third — fan-in as a count rather than a boolean — stays open on purpose: it is the only one
+  that changes how a tier is computed, and it waits for a second caller to confirm the shape.
+- `internal/core` gained a field and its validation, and no governance logic: `GovernedPaths`
+  already governed any path it was handed, and the gap was only in filling it.
 
 ## [0.2.0] - 2026-09-15
 
