@@ -7,6 +7,29 @@ binary; the JSON schemas are versioned independently — see [docs/contract.md](
 
 ## [Unreleased]
 
+### Added
+
+- Published JSON Schema for the component map: [`component-map/0`](schemas/component-map/0).
+  The map is the tool's input rather than something it emits, and it was previously described
+  only by Go structs, an example file and prose — three things that could disagree. It versions
+  separately from the evidence major, because input evolves on its own schedule.
+- `schema_version` on the component map, optional and absent meaning `component-map/0`. It
+  exists so a map written for a later format is refused by an older binary instead of being
+  read on a guess, which would under-tier silently. It settles the collision with `version`,
+  which stays what it always was: the revision of the declared topology, recorded in evidence
+  as `map_version` for reproducibility.
+- A test asserting `component-map/0` and `core.ValidateMap` reject the same maps. A schema a
+  generator can satisfy while the engine refuses the result is worse than no schema. The two
+  rules JSON Schema cannot express — id uniqueness, and refusing an unknown `schema_version` —
+  are named in the schema as engine-enforced rather than quietly missing.
+
+### Notes
+
+- Additive. Every existing map keeps loading unchanged, and no evidence field moved: closing
+  this finding needed no change to `evidence/0`.
+- First of the three open findings recorded in [docs/contract.md](docs/contract.md) to be
+  closed. The other two — fan-in as a count, and governing a generated map — remain open.
+
 ## [0.2.0] - 2026-09-15
 
 ### Added

@@ -103,8 +103,26 @@ type Defaults struct {
 	BreadthThreshold int `yaml:"breadth_threshold" json:"breadth_threshold"`
 }
 
+// ComponentMapSchema is the shape this engine knows how to read. It is not the
+// map's `version`, and the two answer different questions: SchemaVersion says
+// which format the file is written in, `Version` says which revision of this
+// repository's topology it describes. Only the second is recorded in evidence,
+// because only the second is needed to reproduce a decision.
+const ComponentMapSchema = "component-map/0"
+
 // ComponentMap is the declared topology of the repository.
 type ComponentMap struct {
+	// SchemaVersion names the map format. It is optional: every map written
+	// before the format was published omits it, and an absent value means
+	// component-map/0. It exists so a map written for a later format is
+	// rejected by an older binary rather than silently read as this one —
+	// a misread map under-tiers, which is the failure this engine exists to
+	// prevent.
+	SchemaVersion string `yaml:"schema_version,omitempty" json:"schema_version,omitempty"`
+
+	// Version is the revision of the declared topology, chosen by whoever
+	// maintains the map. It is recorded in evidence as map_version so a past
+	// tier can be reproduced against the map that produced it.
 	Version    int         `yaml:"version" json:"version"`
 	Defaults   Defaults    `yaml:"defaults" json:"defaults"`
 	Components []Component `yaml:"components" json:"components"`
@@ -115,6 +133,11 @@ type ComponentMap struct {
 // mask another component. A typo in the map has to fail the run — the whole
 // point of the control is lost if `criticality: critcal` quietly tiers at T0.
 func ValidateMap(m ComponentMap) error {
+	// An unrecognised format is refused rather than read on a guess. Absent is
+	// not unrecognised: maps predating the published schema are still valid.
+	if v := m.SchemaVersion; v != "" && v != ComponentMapSchema {
+		return fmt.Errorf("component map declares schema_version %q, but this binary reads %s", v, ComponentMapSchema)
+	}
 	if len(m.Components) == 0 {
 		return fmt.Errorf("component map declares no components")
 	}

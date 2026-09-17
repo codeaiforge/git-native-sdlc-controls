@@ -1,3 +1,17 @@
+# Validates against schemas/component-map/0/component-map.schema.json.
+#
+# Two different "versions" live on this file, and conflating them is the easiest
+# mistake to make here:
+#
+#   schema_version  the format this file is written in. Optional; absent means
+#                   component-map/0. Set it and an older binary refuses the file
+#                   instead of misreading it. It is not recorded in evidence.
+#   version         the revision of YOUR topology, below. Bump it when you change
+#                   what this map declares. It is recorded in evidence as
+#                   map_version, and with binding_used is what lets a past tier
+#                   be reproduced.
+#
+# schema_version: component-map/0
 version: 1
 defaults:
   unmatched_path_tier: high

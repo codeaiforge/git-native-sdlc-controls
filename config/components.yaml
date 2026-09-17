@@ -1,6 +1,9 @@
 # This repository's own component map — the one the dogfood gate in
 # .github/workflows/controls.yml runs against. config/components.example.yaml is
 # the annotated template for other repositories; this is the live map for this one.
+# schema_version is the format; version below is this repository's topology
+# revision, and the one recorded in evidence as map_version.
+schema_version: component-map/0
 version: 1
 defaults:
   unmatched_path_tier: high
