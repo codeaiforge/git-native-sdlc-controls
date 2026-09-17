@@ -84,8 +84,11 @@ Candidate shapes, neither chosen: a `fan_in: <int>` field, or a `shared` that ac
 threshold rather than a bool. The reason this is not a one-field change is that both
 reopen the escalation model — today every rule adds exactly one tier and the result is
 capped at `T3`. Proportional escalation from a count needs bands, and bands belong in the
-tier policy rather than the map, so the fix spans both schemas. Worth doing deliberately,
-at `evidence/1` and a versioned map schema, not as a patch.
+tier policy rather than the map, so the fix spans the map schema and the policy.
+
+It does **not** reach the evidence contract. `reasons` is a list of strings, so a fan-in
+rule changes what a reason says and no field of `evidence/0`. This lands as a map schema
+bump plus a policy addition, with the evidence contract untouched.
 
 ### A generated map cannot be governed
 
@@ -116,6 +119,34 @@ CAF-SDLC-002. So a finding "against the map schema" is currently a finding again
 things that can disagree. Publishing the map as a versioned schema — and deciding whether
 it shares the evidence major or versions separately — is a prerequisite for acting on the
 two findings above.
+
+### Where this goes next
+
+Recorded, in the order they would be taken, none of them committed to a date:
+
+1. **Publish the component map as a versioned schema.** Mechanical, no behaviour change,
+   and a prerequisite for the rest: a caller that *generates* a map needs a contract to
+   generate against. Settle the `version:` collision at the same time — a map's `version:`
+   is its content revision, the thing `map_version` records for reproducibility, and it is
+   not the schema's version. Two meanings on one file is a defect waiting to be tooled
+   against.
+2. **Map provenance.** One block in the map schema saying where the map came from and what
+   governs it, which the CLI folds into `GovernedPaths`. This closes the second finding
+   outright, and `internal/core` does not change: it already governs any path it is given.
+3. **`fan_in` and policy bands.** Last, and only once a second caller confirms the shape.
+   This is the only step that touches the engine, because it replaces "every rule adds
+   exactly one tier".
+
+The first two findings are the same finding read twice: both are about the provenance of
+the map. Once a map can assert `fan_in: 300`, a reader has to be able to tell whether that
+number was measured or guessed — which is the distinction this tool exists to preserve,
+applied to its own input. CAF-SDLC-010 does it for code; this is the same argument.
+
+The boundary, stated so it is checkable: **the engine accepts declarations and never
+computes them.** A declared fan-in is no less git-native than a declared `criticality` —
+the caller may have computed it from a build graph or typed it by hand, and the engine
+cannot tell. What would break the claim is the engine traversing anything itself. If a
+change here starts to need a build tool or a graph importer, it belongs in the caller.
 
 ## The honesty invariant, in machine-readable form
 
